@@ -16,14 +16,21 @@
 all-features = true
 
 [advisories]
-# Deliberately NOT ignoring RUSTSEC-2026-0187 (lopdf: unbounded-recursion stack overflow on a
-# deeply nested PDF object graph, `SIGABRT`, not catchable by `catch_unwind`). lopdf reaches this
-# crate as a REAL runtime dependency via `pdf-extract`, in exactly the PDF-parsing path this
-# crate documents as untrusted input — see `src/pdf.rs`'s decompression-bomb guard, which this
-# advisory shows is not sufficient on its own. This must fail `cargo deny check` until
-# `pdf-extract`/`lopdf` are upgraded past 0.42.0 (currently resolves to lopdf 0.36.0); do not add
-# an ignore entry for it here without a corresponding fix landing in `src/`.
+# RUSTSEC-2026-0187 (lopdf: unbounded-recursion stack overflow on a deeply nested PDF object
+# graph, `SIGABRT`, not catchable by `catch_unwind`) is FIXED, not ignored: `pdf-extract` is
+# floored at 0.12 in Cargo.toml precisely because it is the first release depending on
+# `lopdf >= 0.42`, which patches it. lopdf reaches this crate as a REAL runtime dependency in
+# exactly the PDF-parsing path documented as untrusted input, so it must never be ignored here —
+# if it ever reappears, the fix is a dependency bump, not an ignore entry.
 ignore = [
+    # Unmaintained (not an exploit). Unlike every other entry below, this one IS in the runtime
+    # graph: `pdf-extract` -> `lopdf` -> `ttf-parser`, used for embedded-font glyph mapping while
+    # extracting text. Accepted rather than fixed because there is no maintained drop-in and the
+    # dependency is not selectable from here — it is lopdf's choice. The exposure is bounded by
+    # the same guards `src/pdf.rs` already applies to untrusted PDFs (byte cap before parse,
+    # `catch_unwind`, parse timeout). Revisit whenever lopdf is bumped; if this ever turns into a
+    # real vulnerability advisory rather than an unmaintained notice, it must be fixed, not ignored.
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser is unmaintained (no known vulnerability); reached at runtime via pdf-extract -> lopdf for embedded-font glyph mapping, not selectable from this crate" },
     # Unmaintained (not an exploit), reached ONLY through the `container-tests` dev-dependency
     # chain (`neo4rs` -> `paste`) used by the Docker-backed Neo4j suite. Never shipped in the
     # published crate. Re-check when `neo4rs` is next bumped.

@@ -54,7 +54,11 @@ const TARGET_VOLUME: &str = "lci-codegraph-container-repos-target";
 /// rewritten history upstream cannot silently change what this suite measures (it would instead
 /// fail the clone outright, which is the correct failure mode).
 const REPOS: &[(&str, &str, &str)] = &[
-    ("log", "rust-lang/log", "037d7a58f6ad184abb3afc4db81d37c43a5696ec"),
+    (
+        "log",
+        "rust-lang/log",
+        "037d7a58f6ad184abb3afc4db81d37c43a5696ec",
+    ),
     (
         "itsdangerous",
         "pallets/itsdangerous",
@@ -160,8 +164,11 @@ fn clone_build_and_walk_all_repos(test_name: &str) -> (Vec<RepoRun>, Duration) {
         let stats_path = output_dir.path().join(format!("{name}.stats.txt"));
         let stats = std::fs::read_to_string(&stats_path).unwrap_or_default();
 
-        let first_raw = std::fs::read_to_string(output_dir.path().join(format!("{name}.first.json")))
-            .unwrap_or_else(|e| panic!("{test_name}: read {name}.first.json: {e}\nstats: {stats}"));
+        let first_raw =
+            std::fs::read_to_string(output_dir.path().join(format!("{name}.first.json")))
+                .unwrap_or_else(|e| {
+                    panic!("{test_name}: read {name}.first.json: {e}\nstats: {stats}")
+                });
         let second_raw =
             std::fs::read_to_string(output_dir.path().join(format!("{name}.second.json")))
                 .unwrap_or_else(|e| {
@@ -191,7 +198,10 @@ fn extractor_holds_its_invariants_over_real_world_repos() {
     }
 
     let (runs, elapsed) = clone_build_and_walk_all_repos(test_name);
-    eprintln!("{test_name}: total wall-clock {elapsed:?} for {} repos", runs.len());
+    eprintln!(
+        "{test_name}: total wall-clock {elapsed:?} for {} repos",
+        runs.len()
+    );
 
     let mut any_calls_edge = false;
 

@@ -39,7 +39,13 @@ tree-sitter-java = "0.23"
 ignore = "0.4"
 # Pure-Rust PDF *text* extraction. Treated as untrusted-input code: bytes are capped BEFORE the
 # parser sees them and the parse is wrapped in `catch_unwind` (it can panic on malformed input).
-pdf-extract = "0.9"
+#
+# Floor of 0.12 is a SECURITY floor, not a preference: it is the first release that depends on
+# `lopdf >= 0.42`, which patches RUSTSEC-2026-0187 — unbounded recursion on deeply nested PDF
+# objects that blows the stack and aborts the process with SIGABRT. That is an abort, not a panic,
+# so this crate's `catch_unwind` guard around the parse does NOT contain it: a ~21 KB crafted file
+# would take down the whole host process. Never relax this below 0.12.
+pdf-extract = "0.12"
 # Pre-flight, *bounded* inflate of a PDF's content streams to catch a decompression bomb BEFORE
 # `pdf-extract` (which wraps `lopdf`/`flate2`) inflates them unbounded.
 flate2 = "1"
@@ -48,7 +54,10 @@ flate2 = "1"
 tempfile = "3.27"
 # Used ONLY to synthesise valid fixture PDFs in tests (a proper xref table is fiddly to write by
 # hand). `pdf-extract` already pulls this transitively. Never a runtime dependency.
-lopdf = "0.36"
+# Kept in lockstep with the version `pdf-extract` resolves, so the fixture builder and the parser
+# under test agree on the format — and so this dev-dep cannot drag the RUSTSEC-2026-0187 lopdf back
+# into the lockfile behind the runtime floor above.
+lopdf = "0.42"
 # --- container-test suite (see the `container-tests` feature below) ---
 # Dev-dependencies cannot be optional in Cargo, so these always resolve; the *tests* that use them
 # are gated behind `required-features` so a plain `cargo test` needs no Docker daemon.

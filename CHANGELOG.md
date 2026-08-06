@@ -16,10 +16,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Python
   - TypeScript/JavaScript (including TSX/JSX)
   - Java
-- Composable gitignore-style ignore-list for selective source inclusion
-- Bounded PDF text extraction with configurable size limits
-- Comprehensive test suite covering unit, integration, and container-based scenarios
+- Composable gitignore-style ignore-list that layers on top of the repository's own `.gitignore`
+  rather than replacing it
+- Bounded PDF text extraction, guarded for untrusted input (byte cap before parse, pre-flight
+  decompression-bomb check, `catch_unwind`, parse timeout)
+- Test suite of 182 tests: 130 unit (93.8% line coverage), 47 integration across per-language
+  fixtures with committed goldens, and 5 Docker-backed container tests — a Neo4j round-trip
+  asserting the downstream retrieval queries, glibc and musl build/run containers, and pinned
+  real-world repository clones
 - Governance-based contribution workflow with AI usage declarations
-- CI/CD pipeline with automated dependency and workflow updates
+- CI covering fmt, clippy, tests, MSRV, coverage floor, rustdoc, `cargo-deny` and a publish
+  dry-run, plus a tag-driven crates.io release workflow
+
+### Security
+
+- `pdf-extract` is floored at 0.12, the first release depending on `lopdf >= 0.42`, which patches
+  [RUSTSEC-2026-0187](https://rustsec.org/advisories/RUSTSEC-2026-0187) — unbounded recursion on
+  deeply nested PDF objects that aborts the process with `SIGABRT`. Because that is an abort and
+  not a panic, the crate's `catch_unwind` guard could not contain it.
 
 [0.1.0]: https://github.com/vymalo/codegraph/releases/tag/v0.1.0
