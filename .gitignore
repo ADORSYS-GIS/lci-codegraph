@@ -1,0 +1,8 @@
+/target
+**/*.rs.bk
+*.pdb
+
+# Scratch space used by the container suites for cloned fixture repositories.
+/tests/fixtures/real-repos/
+
+.DS_Store

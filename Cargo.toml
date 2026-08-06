@@ -1,0 +1,86 @@
+[package]
+name = "lci-codegraph"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/vymalo/codegraph"
+homepage = "https://github.com/vymalo/codegraph"
+documentation = "https://docs.rs/lci-codegraph"
+description = "Code-graph extractor: semantic chunking, a cross-file structural call graph, and embedding-prep over one tree-sitter parse."
+readme = "README.md"
+keywords = ["tree-sitter", "code-graph", "static-analysis", "chunking", "indexing"]
+categories = ["development-tools", "parser-implementations"]
+exclude = ["/.github", "/docs", "/tests/fixtures/real-repos"]
+
+[lib]
+path = "src/lib.rs"
+
+# This crate is a pure extractor: it parses a checkout and returns chunk + graph values. It never
+# talks to a datastore, a cluster, or a forge — hosts map the output onto their own payloads and
+# submit. Keep that boundary: no kube/sqlx/http clients belong in `[dependencies]`.
+[dependencies]
+anyhow = "1.0.103"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+tracing = "0.1.31"
+# Compile-time builders for the wide config constructors (`WalkOptions`, `IgnoreConfig`).
+bon = "3.9.3"
+# Tree-sitter grammars. The structural graph is edges built on top of the symbols these find.
+tree-sitter = "0.26"
+tree-sitter-rust = "0.24"
+tree-sitter-javascript = "0.25"
+tree-sitter-typescript = "0.23.2"
+tree-sitter-python = "0.25"
+tree-sitter-java = "0.23"
+# ripgrep's ignore engine: honours the repo's own `.gitignore` AND lets us layer an
+# operator-configurable glob list on top with the SAME gitignore semantics (`GitignoreBuilder`).
+# This is how the crate *composes with* — rather than replaces — the repo ignores.
+ignore = "0.4"
+# Pure-Rust PDF *text* extraction. Treated as untrusted-input code: bytes are capped BEFORE the
+# parser sees them and the parse is wrapped in `catch_unwind` (it can panic on malformed input).
+pdf-extract = "0.9"
+# Pre-flight, *bounded* inflate of a PDF's content streams to catch a decompression bomb BEFORE
+# `pdf-extract` (which wraps `lopdf`/`flate2`) inflates them unbounded.
+flate2 = "1"
+
+[dev-dependencies]
+tempfile = "3.27"
+# Used ONLY to synthesise valid fixture PDFs in tests (a proper xref table is fiddly to write by
+# hand). `pdf-extract` already pulls this transitively. Never a runtime dependency.
+lopdf = "0.36"
+# --- container-test suite (see the `container-tests` feature below) ---
+# Dev-dependencies cannot be optional in Cargo, so these always resolve; the *tests* that use them
+# are gated behind `required-features` so a plain `cargo test` needs no Docker daemon.
+# Pinned to 0.27 deliberately: `testcontainers-modules` 0.15 depends on `testcontainers ^0.27`, and
+# 0.28 pulls an incompatible `bollard-stubs`. Bump both together, never one alone.
+testcontainers = "0.27"
+testcontainers-modules = { version = "0.15", features = ["neo4j"] }
+neo4rs = "0.8"
+tokio = { version = "1.53", features = ["macros", "rt-multi-thread", "time", "process"] }
+
+[features]
+# Opt-in gate for the Docker-backed suites. `cargo test --features container-tests` requires a
+# reachable Docker daemon; plain `cargo test` runs the unit + integration suites only.
+container-tests = []
+
+# The Docker-backed suites. Each is a separate target so they can be run (and timed) independently.
+#
+# `container_neo4j`  — loads the emitted nodes/edges into a real Neo4j with the same generic
+#                      `:Symbol` + `[:REL {relation}]` write a host performs, then runs the
+#                      `graph_find_symbol` / `graph_get_callers` retrieval queries against it.
+# `container_build`  — builds and runs the crate inside Linux glibc and musl containers, proving the
+#                      tree-sitter C grammars compile and link off the host toolchain.
+# `container_repos`  — clones pinned real-world repositories inside a container and asserts the walk
+#                      holds its invariants on input nobody wrote for the tests.
+[[test]]
+name = "container_neo4j"
+required-features = ["container-tests"]
+
+[[test]]
+name = "container_build"
+required-features = ["container-tests"]
+
+[[test]]
+name = "container_repos"
+required-features = ["container-tests"]
