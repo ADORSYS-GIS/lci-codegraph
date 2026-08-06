@@ -17,7 +17,10 @@ where the output goes.
 lci-codegraph = "0.1"
 ```
 
-MSRV: Rust **1.85** (the crate is edition 2024).
+MSRV: Rust **1.88**. The crate is edition 2024 (floor 1.85), but `lopdf` — pulled in through
+`pdf-extract`, and floored at a version that patches
+[RUSTSEC-2026-0187](https://rustsec.org/advisories/RUSTSEC-2026-0187) — uses let-chains, stabilised
+in 1.88. CI checks this floor on every build.
 
 ## Quickstart
 

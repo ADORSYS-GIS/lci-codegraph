@@ -2,7 +2,11 @@
 name = "lci-codegraph"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+# 1.88, not 1.85 (the edition-2024 floor): `lopdf` >= 0.42 uses let-chains, stabilised in 1.88.
+# Note lopdf 0.42 itself still DECLARES `rust-version = "1.85"` — that declaration is wrong, and
+# `cargo check` on 1.85/1.87 fails with E0658 in `lopdf/src/object.rs`. Verified empirically here:
+# 1.87 fails, 1.88 passes. Do not lower this to match lopdf's own manifest.
+rust-version = "1.88"
 license = "MIT"
 repository = "https://github.com/vymalo/codegraph"
 homepage = "https://github.com/vymalo/codegraph"
