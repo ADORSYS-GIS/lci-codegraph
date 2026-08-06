@@ -331,4 +331,114 @@ mod tests {
         assert!(out.graph.nodes.is_empty(), "graph off by default");
         assert!(!out.chunks.is_empty(), "chunks still produced");
     }
+
+    #[test]
+    fn walk_honours_nested_gitignore_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        write(root, "keep.rs", "fn keep() {}\n");
+        write(root, "sub/.gitignore", "skip.rs\n");
+        write(root, "sub/skip.rs", "fn skip() {}\n");
+        write(root, "sub/also_keep.rs", "fn also_keep() {}\n");
+        let out = walk_checkout(root, &WalkOptions::builder().build()).unwrap();
+        assert!(
+            !out.chunks.iter().any(|c| c.file_path.contains("skip.rs")),
+            "nested .gitignore must be honoured"
+        );
+        assert!(
+            out.chunks
+                .iter()
+                .any(|c| c.file_path.contains("also_keep.rs")),
+            "an un-ignored sibling must still be indexed"
+        );
+    }
+
+    #[test]
+    fn extra_ignore_globs_compose_with_repo_gitignore_not_replace_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        write(root, ".gitignore", "repo_ignored/\n");
+        write(root, "repo_ignored/a.rs", "fn a() {}\n");
+        write(root, "operator_ignored/b.rs", "fn b() {}\n");
+        write(root, "keep.rs", "fn keep() {}\n");
+        let options = WalkOptions::builder()
+            .extra_ignore_globs(vec!["operator_ignored/".to_string()])
+            .build();
+        let out = walk_checkout(root, &options).unwrap();
+        assert!(
+            !out.chunks
+                .iter()
+                .any(|c| c.file_path.contains("repo_ignored")),
+            "repo .gitignore must still apply alongside the operator layer"
+        );
+        assert!(
+            !out.chunks
+                .iter()
+                .any(|c| c.file_path.contains("operator_ignored")),
+            "the operator glob must also apply"
+        );
+        assert!(out.chunks.iter().any(|c| c.file_path.contains("keep.rs")));
+    }
+
+    #[test]
+    fn extract_pdfs_false_skips_pdf_files_entirely() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        write(
+            root,
+            "doc.pdf",
+            "not actually parsed when extraction is off",
+        );
+        write(root, "keep.rs", "fn keep() {}\n");
+        let options = WalkOptions::builder().extract_pdfs(false).build();
+        let out = walk_checkout(root, &options).unwrap();
+        assert_eq!(out.stats.pdfs_extracted, 0);
+        assert_eq!(out.stats.pdfs_skipped, 0);
+        assert!(!out.chunks.iter().any(|c| c.file_path.contains("doc.pdf")));
+        assert!(out.chunks.iter().any(|c| c.file_path.contains("keep.rs")));
+    }
+
+    #[test]
+    fn walk_stats_counters_are_accurate() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        write(root, "a.rs", "fn a() {}\n");
+        write(root, "b.rs", "fn b() {}\n");
+        write(root, "target/gen.rs", "fn gen() {}\n"); // operator-default junk dir
+        let out = walk_checkout(root, &WalkOptions::builder().build()).unwrap();
+        assert_eq!(out.stats.files_chunked, 2, "a.rs + b.rs, not target/gen.rs");
+        assert!(
+            out.stats.paths_ignored >= 1,
+            "at least the target/ dir was pruned"
+        );
+        assert_eq!(out.stats.pdfs_extracted, 0);
+        assert_eq!(out.stats.pdfs_skipped, 0);
+    }
+
+    #[test]
+    fn non_utf8_file_is_skipped_without_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::write(root.join("bad.rs"), [0x66, 0x6e, 0xff, 0xfe, 0x00, 0x62]).unwrap();
+        write(root, "good.rs", "fn good() {}\n");
+        let out = walk_checkout(root, &WalkOptions::builder().build()).unwrap();
+        assert!(!out.chunks.iter().any(|c| c.file_path.contains("bad.rs")));
+        assert!(out.chunks.iter().any(|c| c.file_path.contains("good.rs")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_files_are_not_indexed_by_default() {
+        // `WalkBuilder` defaults to `follow_links(false)`; a symlink's own `file_type()` is neither a
+        // regular file nor traversed as a directory, so it must be silently skipped, not indexed.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        write(root, "target.rs", "fn real() {}\n");
+        std::os::unix::fs::symlink(root.join("target.rs"), root.join("link.rs")).unwrap();
+        let out = walk_checkout(root, &WalkOptions::builder().build()).unwrap();
+        assert_eq!(
+            out.stats.files_chunked, 1,
+            "only the real file is chunked, not the symlink"
+        );
+    }
 }

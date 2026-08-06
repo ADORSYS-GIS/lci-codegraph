@@ -31,3 +31,30 @@ impl LanguageSupport for Java {
         Some(GraphStrategy::Tags(query))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn id_and_extensions() {
+        assert_eq!(Java.id(), "java");
+        assert_eq!(Java.extensions(), &["java"]);
+    }
+
+    #[test]
+    fn graph_strategy_is_a_tags_query_not_rust_native() {
+        assert!(matches!(
+            Java.graph_strategy(),
+            Some(GraphStrategy::Tags(_))
+        ));
+    }
+
+    #[test]
+    fn ts_language_parses_java_source_without_errors() {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&Java.ts_language()).unwrap();
+        let tree = parser.parse("class C { void m() {} }\n", None).unwrap();
+        assert!(!tree.root_node().has_error());
+    }
+}

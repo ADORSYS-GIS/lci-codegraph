@@ -31,3 +31,30 @@ impl LanguageSupport for Python {
         Some(GraphStrategy::Tags(query))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn id_and_extensions() {
+        assert_eq!(Python.id(), "python");
+        assert_eq!(Python.extensions(), &["py"]);
+    }
+
+    #[test]
+    fn graph_strategy_is_a_tags_query_not_rust_native() {
+        assert!(matches!(
+            Python.graph_strategy(),
+            Some(GraphStrategy::Tags(_))
+        ));
+    }
+
+    #[test]
+    fn ts_language_parses_python_source_without_errors() {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&Python.ts_language()).unwrap();
+        let tree = parser.parse("def a():\n    pass\n", None).unwrap();
+        assert!(!tree.root_node().has_error());
+    }
+}

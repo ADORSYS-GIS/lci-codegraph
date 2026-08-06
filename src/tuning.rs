@@ -83,4 +83,54 @@ mod tests {
         assert_eq!(env_usize(key, 7), 7, "unparseable → default");
         unsafe { std::env::remove_var(key) };
     }
+
+    #[test]
+    fn env_usize_overflowing_value_falls_back_to_default() {
+        // A numeral too large for `usize` fails to parse the same way non-numeric text does.
+        let key = "LCI_CODEGRAPH_TEST_ENV_USIZE_OVERFLOW";
+        unsafe { std::env::set_var(key, "999999999999999999999999999999999999") };
+        assert_eq!(env_usize(key, 9), 9, "overflow parse failure → default");
+        unsafe { std::env::remove_var(key) };
+    }
+
+    #[test]
+    fn from_env_reads_all_four_knobs() {
+        let vars = [
+            ("INDEX_EMBED_BATCH_SIZE", "16"),
+            ("INDEX_MAX_CHUNK_LINES", "75"),
+            ("INDEX_WINDOW_SIZE", "40"),
+            ("INDEX_WINDOW_STEP", "20"),
+        ];
+        for (k, v) in vars {
+            unsafe { std::env::set_var(k, v) };
+        }
+        let tuning = IndexTuning::from_env();
+        assert_eq!(tuning.embed_batch_size, 16);
+        assert_eq!(tuning.max_chunk_lines, 75);
+        assert_eq!(tuning.window_size, 40);
+        assert_eq!(tuning.window_step, 20);
+        for (k, _) in vars {
+            unsafe { std::env::remove_var(k) };
+        }
+    }
+
+    #[test]
+    fn from_env_falls_back_to_defaults_when_unset() {
+        for k in [
+            "INDEX_EMBED_BATCH_SIZE",
+            "INDEX_MAX_CHUNK_LINES",
+            "INDEX_WINDOW_SIZE",
+            "INDEX_WINDOW_STEP",
+        ] {
+            unsafe { std::env::remove_var(k) };
+        }
+        let from_env = IndexTuning::from_env();
+        let default = IndexTuning::default();
+        // `IndexTuning` derives no `PartialEq` (kept as-is; adding one is out of scope for a test-only
+        // change), so compare field-by-field.
+        assert_eq!(from_env.embed_batch_size, default.embed_batch_size);
+        assert_eq!(from_env.max_chunk_lines, default.max_chunk_lines);
+        assert_eq!(from_env.window_size, default.window_size);
+        assert_eq!(from_env.window_step, default.window_step);
+    }
 }

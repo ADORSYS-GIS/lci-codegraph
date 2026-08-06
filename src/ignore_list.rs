@@ -198,4 +198,28 @@ mod tests {
         let l = list(&["", "  ", "# a comment"]);
         assert!(!l.is_ignored(Path::new("src/main.rs"), false));
     }
+
+    #[test]
+    fn negation_pattern_unignores_a_previously_ignored_path() {
+        let l = list(&["*.log", "!important.log"]);
+        assert!(l.is_ignored(Path::new("debug.log"), false), "still ignored");
+        assert!(
+            !l.is_ignored(Path::new("important.log"), false),
+            "negation must unignore this specific path"
+        );
+    }
+
+    #[test]
+    fn directory_only_pattern_does_not_match_a_file_of_the_same_name() {
+        // A trailing-slash glob is directory-only: a *file* named `onlydir` must not match.
+        let l = list(&["onlydir/"]);
+        assert!(
+            !l.is_ignored(Path::new("onlydir"), false),
+            "a file with this name must not be ignored"
+        );
+        assert!(
+            l.is_ignored(Path::new("onlydir"), true),
+            "a directory with this name must be ignored"
+        );
+    }
 }

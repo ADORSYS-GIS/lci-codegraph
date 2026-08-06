@@ -34,3 +34,37 @@ pub use ignore_list::{DEFAULT_IGNORE_GLOBS, IgnoreConfig, IgnoreList};
 pub use pdf::{PdfOutcome, extract_from_path as extract_pdf_from_path};
 pub use tuning::IndexTuning;
 pub use walk::{WalkOptions, WalkOutput, WalkStats, walk_checkout, walk_checkout_from_env};
+
+#[cfg(test)]
+mod tests {
+    //! Smoke test for the crate-root public re-export surface — `lib.rs` is pure `pub use` plumbing
+    //! with no logic of its own, so this only proves every re-exported name resolves through the
+    //! crate root the way a downstream host (`agent-runner`) depends on, not any behaviour.
+    use super::*;
+
+    #[test]
+    fn public_re_exports_resolve_and_wire_together() {
+        let chunks: Vec<Chunk> = chunk_text("f.txt", "one line", "text", IndexTuning::default());
+        assert_eq!(chunks.len(), 1);
+
+        let ignore_list =
+            IgnoreList::build(&IgnoreConfig::builder().root("/repo").build()).unwrap();
+        assert!(!DEFAULT_IGNORE_GLOBS.is_empty());
+        assert!(ignore_list.is_ignored(std::path::Path::new("node_modules"), true));
+
+        let graph = Graph::default();
+        assert!(graph.nodes.is_empty());
+        assert!(graph.edges.is_empty());
+        let _: fn() -> Vec<GraphNode> = Vec::new;
+        let _: fn() -> Vec<GraphEdge> = Vec::new;
+
+        match extract_pdf_from_path(std::path::Path::new("/does/not/exist.pdf")) {
+            PdfOutcome::Failed(_) => {}
+            other => panic!("expected Failed for a missing path, got {other:?}"),
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let out: WalkOutput = walk_checkout(dir.path(), &WalkOptions::builder().build()).unwrap();
+        let _: WalkStats = out.stats;
+    }
+}

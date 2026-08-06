@@ -3,33 +3,33 @@
 - **Status:** Accepted — Implemented (Graphify fully removed; `lci-codegraph` is the sole graph engine)
 - **Date:** 2026-07-12 (implemented 2026-07-13)
 - **Deciders:** @stephane-segning
-- **Supersedes:** [ADR-0019](0019-graphify-cli-structural-graph.md); the graph half of [ADR-0010](0010-graphify-treesitter-indexing-baseline.md)
+- **Supersedes:** [ADR-0019](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/adr/0019-graphify-cli-structural-graph.md); the graph half of [ADR-0010](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/adr/0010-graphify-treesitter-indexing-baseline.md)
 
 ## Context and Problem Statement
 
 Structural code-graph extraction today runs through **Graphify** — a standalone, Python-based,
 multi-language (36-grammar) AST→graph extractor bundled into the runner image
-([ADR-0019](0019-graphify-cli-structural-graph.md), the graph half of the
-[ADR-0010](0010-graphify-treesitter-indexing-baseline.md) indexing baseline). The indexer spawns it
+([ADR-0019](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/adr/0019-graphify-cli-structural-graph.md), the graph half of the
+[ADR-0010](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/adr/0010-graphify-treesitter-indexing-baseline.md) indexing baseline). The indexer spawns it
 as `graphify update … --no-cluster`, parses the `graph.json` it writes, and hands the code
 nodes+edges to the control plane (which owns the Neo4j write) — see
-[`indexer/graph.rs`](../../services/agent-runner/src/indexer/graph.rs). The graph it produces is what
+[`indexer/graph.rs`](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/services/agent-runner/src/indexer/graph.rs). The graph it produces is what
 powers the deep-tier retrieval tools `lightbridge_graph_find_symbol` and
-`lightbridge_graph_get_callers` ([`review-agent/src/tools/graph.rs`](../../services/review-agent/src/tools/graph.rs)).
+`lightbridge_graph_get_callers` ([`review-agent/src/tools/graph.rs`](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/services/review-agent/src/tools/graph.rs)).
 
 Graphify is the **only** reason a Python runtime lives in the indexer image, and it is the driver of
 that image's ~4Gi index-Job memory footprint. That footprint already forced a split: the *review*
 runner was carved out to a slim, no-Python image (PR [#207](https://github.com/vymalo/lightbridge-code-intelligence/pull/207))
 precisely so review pods would not carry the Graphify weight. The result is two runner images that
 must be built, scanned, and kept in lockstep. Meanwhile the semantic (pgvector) path is *already*
-in-house Rust: [`indexer/chunker.rs`](../../services/agent-runner/src/indexer/chunker.rs) uses
+in-house Rust: [`indexer/chunker.rs`](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/services/agent-runner/src/indexer/chunker.rs) uses
 tree-sitter to extract the same class of symbols Graphify does (functions, methods, structs, enums,
 traits, classes, modules) before embedding via the OpenAI-compatible eaig gateway
-([`agent-clients/src/embeddings.rs`](../../services/agent-clients/src/embeddings.rs), qwen3-embedding-8b,
+([`agent-clients/src/embeddings.rs`](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/services/agent-clients/src/embeddings.rs), qwen3-embedding-8b,
 4096-dim). The structural half is the last thing pinning us to an external runtime.
 
-This is a **control-plane v2** decision ([RFC-0007](../rfc/0007-control-plane-v2-planes.md)):
-the new **agent-plane** ([ADR-0085](0085-agent-execution-plane.md)) wants to run its `index` mode
+This is a **control-plane v2** decision ([RFC-0007](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/rfc/0007-control-plane-v2-planes.md)):
+the new **agent-plane** ([ADR-0085](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/adr/0085-agent-execution-plane.md)) wants to run its `index` mode
 from **one lean binary**, and a Python-shaped dependency is exactly what makes that impossible. The
 question: do we keep driving graph extraction out to an external tool, or own it?
 
@@ -37,7 +37,7 @@ question: do we keep driving graph extraction out to an external tool, or own it
 
 - **Collapse the runner images.** With no Python in the indexer, the review and index images have no
   reason to differ — the [#207](https://github.com/vymalo/lightbridge-code-intelligence/pull/207)
-  split dissolves and the single agent-plane binary ([ADR-0085](0085-agent-execution-plane.md))
+  split dissolves and the single agent-plane binary ([ADR-0085](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/adr/0085-agent-execution-plane.md))
   becomes viable. This is the load-bearing driver.
 - **Right-size the index Job.** A Rust extractor is bounded and profileable; the ~4Gi footprint is a
   Python/Graphify artifact, not an intrinsic cost of graph extraction.
@@ -55,7 +55,7 @@ question: do we keep driving graph extraction out to an external tool, or own it
 - **Option A — keep Graphify.** Zero migration cost and a mature 36-grammar extractor. Rejected: it
   hard-pins a Python runtime into the image, drives the ~4Gi index-Job footprint, keeps the
   [#207](https://github.com/vymalo/lightbridge-code-intelligence/pull/207) image split alive, and
-  **structurally blocks the single agent-plane binary** ([ADR-0085](0085-agent-execution-plane.md)) —
+  **structurally blocks the single agent-plane binary** ([ADR-0085](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/adr/0085-agent-execution-plane.md)) —
   the whole point of control-plane v2's indexer. It is also an external dependency we cannot tune.
 - **Option B — swap Graphify for a different external graph tool** (e.g. another CLI/service).
   Rejected on mechanism: it is the *same class* of dependency — a separate runtime, its own image
@@ -64,7 +64,7 @@ question: do we keep driving graph extraction out to an external tool, or own it
   not collapse the images or unblock the single binary.
 - **Option C — build an in-house Rust crate `lci-codegraph` (chosen).** Owns chunking + graph +
   embedding-prep as one crate on the shared tree-sitter parse, under the `lci-*` prefix
-  ([ADR-0083](0083-platform-crate-architecture-and-cratestack-data-layer.md)).
+  ([ADR-0083](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/adr/0083-platform-crate-architecture-and-cratestack-data-layer.md)).
 
 ## Decision Outcome
 
@@ -91,7 +91,7 @@ target against Graphify (see Risk register).
 embedding *preparation*, feeding the existing OpenAI-compatible embeddings path unchanged
 (qwen3-embedding-8b, 4096-dim, via the internal eaig gateway). Chunking, graph, and embedding-prep
 become **one crate over one parse of the tree** rather than logic scattered across `chunker.rs`,
-`graph.rs` (external), and `mod.rs`. Batching/round-trip tuning ([`IndexTuning`](../../services/agent-runner/src/indexer/mod.rs),
+`graph.rs` (external), and `mod.rs`. Batching/round-trip tuning ([`IndexTuning`](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/services/agent-runner/src/indexer/mod.rs),
 `INDEX_EMBED_BATCH_SIZE` et al., and the gateway large-response cap it exists to work around) carries
 over verbatim.
 
@@ -103,7 +103,7 @@ PDF parsing over untrusted repo input is a crash/OOM surface that must be bounde
 
 **4. Configurable ignore-list.** Skip paths like `target/`, `node_modules/`, `.git/`, `dist/`,
 `build/`, `vendor/`, `.venv/`, `__pycache__/` even when erroneously committed. Today this is a
-hardcoded `matches!` set in [`indexer/mod.rs`](../../services/agent-runner/src/indexer/mod.rs); the
+hardcoded `matches!` set in [`indexer/mod.rs`](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/services/agent-runner/src/indexer/mod.rs); the
 crate replaces it with **gitignore-style glob semantics, operator-configurable, with those names as
 built-in defaults** (the "make everything configurable" requirement). Crucially it **composes with,
 not replaces, the repo's own `.gitignore`** — the operator list is an *additional* filter for junk
@@ -113,9 +113,9 @@ logged so a misconfiguration hiding real files is diagnosable rather than silent
 ### Where it sits
 
 `lci-codegraph` is a shared `lci-*` library crate consumed by the agent-plane's `index` mode
-([ADR-0085](0085-agent-execution-plane.md)); it holds no `kube`/`sqlx`/forge dependencies and submits
+([ADR-0085](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/adr/0085-agent-execution-plane.md)); it holds no `kube`/`sqlx`/forge dependencies and submits
 through the internal API exactly as `index_checkout` does today. It slots into the
-[RFC-0002](../rfc/0002-incremental-layered-indexing.md) incremental-indexing model unchanged — it is
+[RFC-0002](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/rfc/0002-incremental-layered-indexing.md) incremental-indexing model unchanged — it is
 the *extractor* the layered/snapshot machinery drives, so snapshot reuse and pruning are orthogonal
 to this decision.
 
@@ -134,7 +134,7 @@ when every actively-indexed language is at parity does Graphify — and with it 
   binary, no 4Gi ghost — and **dissolves the [#207](https://github.com/vymalo/lightbridge-code-intelligence/pull/207)
   image split**. With no Python anywhere, the `review` and `index` runners collapse into one lean
   binary, which is exactly what makes the single agent-plane binary
-  ([ADR-0085](0085-agent-execution-plane.md)) viable.
+  ([ADR-0085](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/adr/0085-agent-execution-plane.md)) viable.
 - **Good:** graph extraction becomes a core competency we own — per-language tuning, resolution
   heuristics, and edge kinds are ours to improve, with no external release cadence or process boundary.
 - **Good:** the tree is parsed once. Chunking, graph, and embedding-prep share one tree-sitter pass
@@ -188,21 +188,21 @@ when every actively-indexed language is at parity does Graphify — and with it 
 
 ## More Information
 
-- [RFC-0007](../rfc/0007-control-plane-v2-planes.md) — control-plane v2 planes; this crate is the
+- [RFC-0007](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/rfc/0007-control-plane-v2-planes.md) — control-plane v2 planes; this crate is the
   indexer that lets the agent-plane's `index` mode ship as one binary.
-- [ADR-0085](0085-agent-execution-plane.md) — the agent execution plane that consumes `lci-codegraph`
+- [ADR-0085](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/adr/0085-agent-execution-plane.md) — the agent execution plane that consumes `lci-codegraph`
   in `index` mode; the single-binary goal this ADR unblocks.
-- [ADR-0083](0083-platform-crate-architecture-and-cratestack-data-layer.md) — the `lci-*` crate prefix
+- [ADR-0083](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/adr/0083-platform-crate-architecture-and-cratestack-data-layer.md) — the `lci-*` crate prefix
   and workspace architecture this crate joins.
-- [RFC-0002](../rfc/0002-incremental-layered-indexing.md) — incremental/layered indexing; the
+- [RFC-0002](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/rfc/0002-incremental-layered-indexing.md) — incremental/layered indexing; the
   extractor this crate replaces plugs into that machinery unchanged.
-- What is being retired / reused: [ADR-0019](0019-graphify-cli-structural-graph.md) (Graphify),
-  [ADR-0010](0010-graphify-treesitter-indexing-baseline.md) (the baseline),
-  [`indexer/graph.rs`](../../services/agent-runner/src/indexer/graph.rs) (Graphify driver),
-  [`indexer/chunker.rs`](../../services/agent-runner/src/indexer/chunker.rs) +
-  [`indexer/mod.rs`](../../services/agent-runner/src/indexer/mod.rs) (the tree-sitter chunker + walk +
-  ignore set this crate absorbs), [`agent-clients/src/embeddings.rs`](../../services/agent-clients/src/embeddings.rs)
+- What is being retired / reused: [ADR-0019](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/adr/0019-graphify-cli-structural-graph.md) (Graphify),
+  [ADR-0010](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/docs/adr/0010-graphify-treesitter-indexing-baseline.md) (the baseline),
+  [`indexer/graph.rs`](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/services/agent-runner/src/indexer/graph.rs) (Graphify driver),
+  [`indexer/chunker.rs`](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/services/agent-runner/src/indexer/chunker.rs) +
+  [`indexer/mod.rs`](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/services/agent-runner/src/indexer/mod.rs) (the tree-sitter chunker + walk +
+  ignore set this crate absorbs), [`agent-clients/src/embeddings.rs`](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/services/agent-clients/src/embeddings.rs)
   (the embeddings path it keeps feeding), and the consumers
-  [`review-agent/src/tools/graph.rs`](../../services/review-agent/src/tools/graph.rs)
+  [`review-agent/src/tools/graph.rs`](https://github.com/vymalo/lightbridge-code-intelligence/blob/main/services/review-agent/src/tools/graph.rs)
   (`graph_find_symbol` / `graph_get_callers`).
 - The image split this dissolves: PR [#207](https://github.com/vymalo/lightbridge-code-intelligence/pull/207).

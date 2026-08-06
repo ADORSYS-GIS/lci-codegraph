@@ -74,3 +74,54 @@ impl LanguageSupport for Tsx {
         Some(GraphStrategy::Tags(query))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn typescript_id_and_extension() {
+        assert_eq!(TypeScript.id(), "typescript");
+        assert_eq!(TypeScript.extensions(), &["ts"]);
+    }
+
+    #[test]
+    fn tsx_id_and_extension_are_distinct_from_plain_typescript() {
+        assert_eq!(Tsx.id(), "tsx");
+        assert_eq!(Tsx.extensions(), &["tsx"]);
+    }
+
+    #[test]
+    fn both_grammars_select_a_tags_query_strategy() {
+        assert!(matches!(
+            TypeScript.graph_strategy(),
+            Some(GraphStrategy::Tags(_))
+        ));
+        assert!(matches!(Tsx.graph_strategy(), Some(GraphStrategy::Tags(_))));
+    }
+
+    #[test]
+    fn plain_typescript_grammar_errors_on_jsx() {
+        // The plain TS grammar does NOT parse JSX — this is exactly why `.tsx` needs its own grammar
+        // (the next test). A component body with a JSX expression must surface as a parse error here.
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&TypeScript.ts_language()).unwrap();
+        let tree = parser
+            .parse("const w = () => { return <div/>; };\n", None)
+            .unwrap();
+        assert!(
+            tree.root_node().has_error(),
+            "plain TS grammar should choke on a JSX body"
+        );
+    }
+
+    #[test]
+    fn tsx_grammar_parses_jsx_without_errors() {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&Tsx.ts_language()).unwrap();
+        let tree = parser
+            .parse("const w = () => { return <div/>; };\n", None)
+            .unwrap();
+        assert!(!tree.root_node().has_error());
+    }
+}

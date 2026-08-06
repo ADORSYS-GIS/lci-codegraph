@@ -26,3 +26,30 @@ impl LanguageSupport for Rust {
         Some(GraphStrategy::RustNative)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn id_and_extensions() {
+        assert_eq!(Rust.id(), "rust");
+        assert_eq!(Rust.extensions(), &["rs"]);
+    }
+
+    #[test]
+    fn graph_strategy_is_rust_native_not_tags() {
+        assert!(matches!(
+            Rust.graph_strategy(),
+            Some(GraphStrategy::RustNative)
+        ));
+    }
+
+    #[test]
+    fn ts_language_parses_rust_source_without_errors() {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&Rust.ts_language()).unwrap();
+        let tree = parser.parse("fn a() {}\n", None).unwrap();
+        assert!(!tree.root_node().has_error());
+    }
+}

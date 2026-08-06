@@ -10,10 +10,10 @@
 //!
 //! Languages with a real extractor today: **Rust** (ADR-0086 "Rust language first"), **Python**,
 //! **TypeScript/JavaScript** (incl. JSX/TSX), and **Java**. Every language emits the SAME node/edge
-//! vocabulary — the cross-file resolver ([`resolve::resolve`]/[`resolve::pick`]) is language-agnostic
+//! vocabulary — the cross-file resolver ([`resolve`]/`pick`) is language-agnostic
 //! and shared verbatim. Definitions and call references are identified by each grammar's bundled
 //! `tags.scm` query ([`crate::tags`]); Rust keeps its own node-kind extractor for a byte-stable
-//! golden. See [`emit::Classifier`]. Relations emitted:
+//! golden. See `emit::Classifier`. Relations emitted:
 //! - `contains` — file → top-level def, and container def (mod/struct/trait/enum/class) → nested def.
 //! - `method` — a type container (impl/trait/struct/enum/class/interface) → a callable it defines.
 //!   This is a specialisation of `contains` kept separate for parity with Graphify (which emits
@@ -26,12 +26,15 @@
 //!
 //! ## Module layout
 //! The module is split by concern, each a single-responsibility slice of the pipeline:
-//! - [`emit`] — the tree-sitter DFS that emits def nodes + `contains`/`method` edges and records call
-//!   sites ([`emit::extract_file`], the language [`emit::Classifier`] dispatch).
-//! - [`callee`] — parses a call site's callee reference (bare name + optional type qualifier) out of
+//! - `emit` — the tree-sitter DFS that emits def nodes + `contains`/`method` edges and records call
+//!   sites ([`extract_file`], the language `emit::Classifier` dispatch).
+//! - `callee` — parses a call site's callee reference (bare name + optional type qualifier) out of
 //!   the AST, for both the Rust `call_expression` navigation and the tags-captured callee name node.
-//! - [`resolve`] — the cross-file name resolver ([`resolve::resolve`]/[`resolve::pick`]) that turns
+//! - `resolve` — the cross-file name resolver ([`resolve`]/`pick`) that turns
 //!   recorded call sites into `calls` edges.
+//!
+//! `emit`, `callee` and `resolve` are private modules; only [`extract_file`] and [`resolve`] are
+//! re-exported, so the names above are written as plain code spans rather than intra-doc links.
 
 use serde::Serialize;
 

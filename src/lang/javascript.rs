@@ -33,3 +33,33 @@ impl LanguageSupport for JavaScript {
         Some(GraphStrategy::Tags(query))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn id_and_extensions_cover_js_jsx_mjs_cjs() {
+        assert_eq!(JavaScript.id(), "javascript");
+        assert_eq!(JavaScript.extensions(), &["js", "jsx", "mjs", "cjs"]);
+    }
+
+    #[test]
+    fn graph_strategy_is_a_tags_query_not_rust_native() {
+        assert!(matches!(
+            JavaScript.graph_strategy(),
+            Some(GraphStrategy::Tags(_))
+        ));
+    }
+
+    #[test]
+    fn ts_language_parses_jsx_without_errors() {
+        // The JS grammar already parses JSX, so `.jsx` shares it — confirm no error nodes.
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&JavaScript.ts_language()).unwrap();
+        let tree = parser
+            .parse("function App() { return <div/>; }\n", None)
+            .unwrap();
+        assert!(!tree.root_node().has_error());
+    }
+}

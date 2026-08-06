@@ -254,3 +254,147 @@ fn file_label(source_file: &str) -> String {
         .unwrap_or(source_file)
         .to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for [`extract_file`]'s DFS directly (not through [`super::resolve::resolve`]), plus
+    //! the small helpers it uses. End-to-end call-resolution behaviour lives in `graph::tests`; these
+    //! isolate the emit pass's own contract: what nodes/edges one file's facts contain.
+    use super::*;
+    use crate::lang;
+
+    fn facts_for(language: &str, path: &str, src: &str) -> FileSymbols {
+        let tree = lang::parse(src, language).expect("source parses");
+        extract_file(&tree, path, src, language)
+    }
+
+    #[test]
+    fn unsupported_language_yields_completely_empty_facts() {
+        // A tree exists (any grammar can produce one), but the *language id* has no graph strategy —
+        // must short-circuit before even the file node is emitted.
+        let tree = lang::parse("fn a() {}\n", "rust").expect("parses");
+        let facts = extract_file(&tree, "f.go", "fn a() {}\n", "go");
+        assert!(
+            facts.nodes.is_empty(),
+            "no file node either: {:?}",
+            facts.nodes
+        );
+        assert!(facts.contains.is_empty());
+        assert!(facts.calls.is_empty());
+        assert!(facts.callables.is_empty());
+    }
+
+    #[test]
+    fn file_node_is_emitted_with_path_id_and_basename_label() {
+        let facts = facts_for("rust", "src/lib/math.rs", "fn add() {}\n");
+        let file = facts
+            .nodes
+            .iter()
+            .find(|n| n.node_id == "src/lib/math.rs")
+            .expect("file node present");
+        assert_eq!(file.label, "math.rs");
+        assert_eq!(
+            file.start_line, 1,
+            "file node is line 1, like Graphify's L1"
+        );
+    }
+
+    #[test]
+    fn nested_module_chain_produces_a_contains_chain() {
+        // file → mod a → mod b → fn f, all `contains` (no type container in the chain).
+        let src = "mod a {\n    mod b {\n        fn f() {}\n    }\n}\n";
+        let facts = facts_for("rust", "src/n.rs", src);
+        let mod_a = facts.nodes.iter().find(|n| n.label == "a").unwrap();
+        let mod_b = facts.nodes.iter().find(|n| n.label == "b").unwrap();
+        let f = facts.nodes.iter().find(|n| n.label == "f()").unwrap();
+        assert!(
+            facts.contains.iter().any(|e| e.relation == "contains"
+                && e.source == "src/n.rs"
+                && e.target == mod_a.node_id),
+            "file contains mod a"
+        );
+        assert!(
+            facts.contains.iter().any(|e| e.relation == "contains"
+                && e.source == mod_a.node_id
+                && e.target == mod_b.node_id),
+            "mod a contains mod b"
+        );
+        assert!(
+            facts.contains.iter().any(|e| e.relation == "contains"
+                && e.source == mod_b.node_id
+                && e.target == f.node_id),
+            "mod b contains f"
+        );
+    }
+
+    #[test]
+    fn trait_container_emits_a_method_edge_for_its_fn() {
+        // A default-bodied trait method: interesting_node only classifies `function_item`, which is
+        // what a body-bearing method parses as. (A signature-only `fn f(&self);` parses as
+        // `function_signature_item` and is NOT classified at all — see the crate-level bug report.)
+        let src = "trait T {\n    fn f(&self) {}\n}\n";
+        let facts = facts_for("rust", "src/t.rs", src);
+        let trait_node = facts.nodes.iter().find(|n| n.label == "T").unwrap();
+        let f = facts.nodes.iter().find(|n| n.label == "f()").unwrap();
+        assert!(
+            facts.contains.iter().any(|e| e.relation == "method"
+                && e.source == trait_node.node_id
+                && e.target == f.node_id),
+            "trait → f must be a `method` edge; got {:?}",
+            facts.contains
+        );
+    }
+
+    #[test]
+    fn tagged_class_container_emits_a_method_edge_for_its_method() {
+        let src = "class C:\n    def m(self):\n        pass\n";
+        let facts = facts_for("python", "c.py", src);
+        let class = facts.nodes.iter().find(|n| n.label == "C").unwrap();
+        let m = facts.nodes.iter().find(|n| n.label == "m()").unwrap();
+        assert!(
+            facts.contains.iter().any(|e| e.relation == "method"
+                && e.source == class.node_id
+                && e.target == m.node_id),
+            "class → m must be a `method` edge; got {:?}",
+            facts.contains
+        );
+    }
+
+    #[test]
+    fn def_line_numbers_are_one_based() {
+        let facts = facts_for("rust", "src/m.rs", "\n\nfn add() {}\n"); // add on source line 3
+        let add = facts.nodes.iter().find(|n| n.label == "add()").unwrap();
+        assert_eq!(add.start_line, 3);
+    }
+
+    #[test]
+    fn callable_labels_carry_a_parens_suffix_but_non_callables_dont() {
+        let facts = facts_for("rust", "src/m.rs", "struct S;\nfn f() {}\n");
+        assert!(facts.nodes.iter().any(|n| n.label == "f()"));
+        assert!(
+            facts.nodes.iter().any(|n| n.label == "S"),
+            "non-callable def has no parens; nodes = {:?}",
+            facts.nodes
+        );
+    }
+
+    #[test]
+    fn file_label_strips_leading_directories() {
+        assert_eq!(file_label("src/lib/math.rs"), "math.rs");
+    }
+
+    #[test]
+    fn file_label_of_a_bare_filename_is_itself() {
+        assert_eq!(file_label("math.rs"), "math.rs");
+    }
+
+    #[test]
+    fn is_type_container_true_only_for_type_kinds() {
+        for kind in ["impl", "trait", "struct", "enum", "class", "interface"] {
+            assert!(is_type_container(Some(kind)), "{kind} is a type container");
+        }
+        assert!(!is_type_container(Some("function")));
+        assert!(!is_type_container(Some("module")));
+        assert!(!is_type_container(None));
+    }
+}

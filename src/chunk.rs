@@ -259,4 +259,51 @@ mod tests {
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].start_line, 0);
     }
+
+    #[test]
+    fn oversized_file_over_the_byte_cap_is_skipped() {
+        let src = "a".repeat(MAX_FILE_BYTES + 1);
+        let chunks = chunk_file("huge.txt", &src, "text", IndexTuning::default());
+        assert!(
+            chunks.is_empty(),
+            "a file over MAX_FILE_BYTES must be skipped"
+        );
+    }
+
+    #[test]
+    fn file_at_exactly_the_byte_cap_is_not_skipped() {
+        // The check is strictly `>`, so a file exactly at the ceiling must still be chunked.
+        let src = "a".repeat(MAX_FILE_BYTES);
+        let chunks = chunk_file("boundary.txt", &src, "text", IndexTuning::default());
+        assert!(
+            !chunks.is_empty(),
+            "a file exactly at MAX_FILE_BYTES must still be chunked"
+        );
+    }
+
+    #[test]
+    fn empty_file_produces_no_chunks() {
+        let chunks = chunk_file("empty.rs", "", "rust", IndexTuning::default());
+        assert!(chunks.is_empty());
+    }
+
+    #[test]
+    fn whitespace_only_file_still_falls_back_to_a_window_chunk() {
+        let src = "   \n\n  \n";
+        let chunks = chunk_file("blank.txt", src, "text", IndexTuning::default());
+        assert!(!chunks.is_empty(), "whitespace-only content is not empty()");
+        assert!(chunks.iter().all(|c| c.chunk_type == "window"));
+    }
+
+    #[test]
+    fn source_with_no_recognised_nodes_falls_back_to_windows() {
+        // Valid Rust with a grammar, but nothing `interesting_node` classifies (no fn/struct/etc.).
+        let src = "use std::collections::HashMap;\n";
+        let chunks = chunk_file("uses.rs", src, "rust", IndexTuning::default());
+        assert!(
+            !chunks.is_empty(),
+            "must still fall back to windowed chunks"
+        );
+        assert!(chunks.iter().all(|c| c.chunk_type == "window"));
+    }
 }

@@ -113,3 +113,251 @@ fn text(node: &Node<'_>, bytes: &[u8]) -> Option<String> {
         .ok()
         .map(str::to_string)
 }
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for callee-reference parsing, isolated from the shared DFS walk in [`super::emit`].
+    //! Real tree-sitter parses (never hand-mocked nodes) for both feed paths: the Rust
+    //! `call_expression` navigation ([`callee_ref_of`]/[`impl_type_name`]), and the tags-captured
+    //! callee name node other languages use ([`qualifier_from_callee_node`]).
+    use super::*;
+    use crate::lang;
+
+    /// Parse Rust `src`, find the first node of `kind` in the tree (pre-order DFS), and pass it to
+    /// `f`. Panics if no such node exists — test ergonomics.
+    fn with_rust_node<R>(src: &str, kind: &str, f: impl FnOnce(&Node<'_>, &[u8]) -> R) -> R {
+        let tree = lang::parse(src, "rust").expect("rust source parses");
+        let bytes = src.as_bytes();
+        let node = find_first(&tree.root_node(), kind)
+            .unwrap_or_else(|| panic!("no {kind:?} node in {src:?}"));
+        f(&node, bytes)
+    }
+
+    fn find_first<'a>(node: &Node<'a>, kind: &str) -> Option<Node<'a>> {
+        if node.kind() == kind {
+            return Some(*node);
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if let Some(found) = find_first(&child, kind) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
+    // ── Rust `call_expression` navigation ──────────────────────────────────────────────────────
+
+    #[test]
+    fn bare_call_has_name_and_no_qualifier() {
+        with_rust_node("fn go() { foo(); }", "call_expression", |call, bytes| {
+            let r = callee_ref_of(call, bytes).expect("bare call has a callee ref");
+            assert_eq!(r.name, "foo");
+            assert_eq!(r.qualifier, None);
+        });
+    }
+
+    #[test]
+    fn scoped_call_captures_name_and_its_qualifier() {
+        with_rust_node("fn go() { A::new(); }", "call_expression", |call, bytes| {
+            let r = callee_ref_of(call, bytes).expect("scoped call has a callee ref");
+            assert_eq!(r.name, "new");
+            assert_eq!(r.qualifier.as_deref(), Some("A"));
+        });
+    }
+
+    #[test]
+    fn nested_scoped_call_qualifier_is_the_segment_before_the_name() {
+        // `a::b::foo()` — callable is `foo`; the qualifier is the segment directly before it (`b`),
+        // not the whole path.
+        with_rust_node(
+            "fn go() { a::b::foo(); }",
+            "call_expression",
+            |call, bytes| {
+                let r = callee_ref_of(call, bytes).expect("nested scoped call has a callee ref");
+                assert_eq!(r.name, "foo");
+                assert_eq!(r.qualifier.as_deref(), Some("b"));
+            },
+        );
+    }
+
+    #[test]
+    fn method_call_field_expression_has_no_qualifier() {
+        // `x.foo()` — the receiver's type is unknown without inference, so no qualifier is recovered
+        // (a bogus qualifier would risk mis-attribution).
+        with_rust_node(
+            "fn go(x: X) { x.foo(); }",
+            "call_expression",
+            |call, bytes| {
+                let r = callee_ref_of(call, bytes).expect("method call has a callee ref");
+                assert_eq!(r.name, "foo");
+                assert_eq!(r.qualifier, None);
+            },
+        );
+    }
+
+    #[test]
+    fn chained_method_call_resolves_to_the_final_segment() {
+        // `a.b().c()` — the outer call's callee is `c`; the qualifier is still unknown (chained off
+        // another call's result, not an identifier).
+        with_rust_node(
+            "fn go(a: A) { a.b().c(); }",
+            "call_expression",
+            |call, bytes| {
+                let r = callee_ref_of(call, bytes).expect("outer call has a callee ref");
+                assert_eq!(r.name, "c");
+                assert_eq!(r.qualifier, None);
+            },
+        );
+    }
+
+    #[test]
+    fn generic_function_call_unwraps_to_the_inner_callee() {
+        with_rust_node(
+            "fn go() { foo::<T>(); }",
+            "call_expression",
+            |call, bytes| {
+                let r = callee_ref_of(call, bytes).expect("turbofish call has a callee ref");
+                assert_eq!(r.name, "foo");
+                assert_eq!(r.qualifier, None);
+            },
+        );
+    }
+
+    #[test]
+    fn non_call_node_yields_no_callee_ref() {
+        // An `index_expression` has no `function` field — `callee_ref_of` must yield `None`, not
+        // panic or misparse.
+        with_rust_node(
+            "fn go(arr: [i32; 3]) { let _ = arr[0]; }",
+            "index_expression",
+            |node, bytes| {
+                assert!(callee_ref_of(node, bytes).is_none());
+            },
+        );
+    }
+
+    // ── `impl_type_name` ────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn impl_type_name_for_a_plain_inherent_impl() {
+        with_rust_node("impl S { fn f() {} }", "impl_item", |node, bytes| {
+            assert_eq!(impl_type_name(node, bytes).as_deref(), Some("S"));
+        });
+    }
+
+    #[test]
+    fn impl_type_name_for_a_trait_impl_is_the_implementing_type_not_the_trait() {
+        with_rust_node("impl T for S { fn f() {} }", "impl_item", |node, bytes| {
+            assert_eq!(impl_type_name(node, bytes).as_deref(), Some("S"));
+        });
+    }
+
+    #[test]
+    fn impl_type_name_for_a_generic_impl_uses_the_head_type() {
+        with_rust_node("impl Vec<i32> { fn f() {} }", "impl_item", |node, bytes| {
+            assert_eq!(impl_type_name(node, bytes).as_deref(), Some("Vec"));
+        });
+    }
+
+    // ── `qualifier_from_callee_node` (tags-captured callee name node) ─────────────────────────────
+
+    /// Parse `src` with `language`, find the first node of `kind`, and pass it to `f`.
+    fn with_tagged_node<R>(
+        src: &str,
+        language: &str,
+        kind: &str,
+        f: impl FnOnce(&Node<'_>, &[u8]) -> R,
+    ) -> R {
+        let tree = lang::parse(src, language).expect("source parses");
+        let bytes = src.as_bytes();
+        let node = find_first(&tree.root_node(), kind)
+            .unwrap_or_else(|| panic!("no {kind:?} node in {src:?}"));
+        f(&node, bytes)
+    }
+
+    #[test]
+    fn js_member_expression_receiver_is_the_qualifier() {
+        // `Foo.bar()` — the callee name node is the `property` field; its qualifier is the receiver.
+        with_tagged_node(
+            "Foo.bar();",
+            "javascript",
+            "member_expression",
+            |member, bytes| {
+                let name_node = member.child_by_field_name("property").unwrap();
+                assert_eq!(
+                    qualifier_from_callee_node(&name_node, bytes).as_deref(),
+                    Some("Foo")
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn python_attribute_receiver_is_the_qualifier() {
+        with_tagged_node("obj.m()", "python", "attribute", |attr, bytes| {
+            let name_node = attr.child_by_field_name("attribute").unwrap();
+            assert_eq!(
+                qualifier_from_callee_node(&name_node, bytes).as_deref(),
+                Some("obj")
+            );
+        });
+    }
+
+    #[test]
+    fn java_method_invocation_receiver_is_the_qualifier() {
+        with_tagged_node(
+            "class C { void go() { obj.m(); } }",
+            "java",
+            "method_invocation",
+            |call, bytes| {
+                let name_node = call.child_by_field_name("name").unwrap();
+                assert_eq!(
+                    qualifier_from_callee_node(&name_node, bytes).as_deref(),
+                    Some("obj")
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn implicit_self_family_receivers_yield_no_qualifier() {
+        // `self`/`cls`/`this`/`super` carry no type information — a call through any of them must
+        // resolve on the bare method name, never a bogus qualifier.
+        for receiver in ["self", "cls", "this", "super"] {
+            let src = format!("{receiver}.m();");
+            with_tagged_node(&src, "javascript", "member_expression", |member, bytes| {
+                let name_node = member.child_by_field_name("property").unwrap();
+                assert_eq!(
+                    qualifier_from_callee_node(&name_node, bytes),
+                    None,
+                    "{receiver} must not yield a qualifier"
+                );
+            });
+        }
+    }
+
+    #[test]
+    fn non_identifier_receiver_yields_no_qualifier() {
+        // `getObj().bar()` — the receiver is a call expression, not a plain identifier that could
+        // name a type, so no qualifier is recovered.
+        with_tagged_node(
+            "getObj().bar();",
+            "javascript",
+            "member_expression",
+            |member, bytes| {
+                let name_node = member.child_by_field_name("property").unwrap();
+                assert_eq!(qualifier_from_callee_node(&name_node, bytes), None);
+            },
+        );
+    }
+
+    #[test]
+    fn bare_call_name_node_yields_no_qualifier() {
+        // `foo()` — the name node's parent is the call itself, not a member/attribute access.
+        with_tagged_node("foo();", "javascript", "call_expression", |call, bytes| {
+            let name_node = call.child_by_field_name("function").unwrap();
+            assert_eq!(qualifier_from_callee_node(&name_node, bytes), None);
+        });
+    }
+}
