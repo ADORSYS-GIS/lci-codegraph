@@ -20,6 +20,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Manual re-run, for when a job fails on infrastructure rather than on the code (a registry
+  # blip, a runner image change) and the fix is simply "run it again" with no commit to make.
+  workflow_dispatch:
 
 permissions:
   contents: read
