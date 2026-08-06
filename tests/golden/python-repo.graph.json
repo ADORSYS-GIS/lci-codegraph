@@ -1,0 +1,143 @@
+{
+  "nodes": [
+    {
+      "node_id": "app/main.py",
+      "label": "main.py",
+      "source_file": "app/main.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "app/main.py#10:run_bare",
+      "label": "run_bare()",
+      "source_file": "app/main.py",
+      "start_line": 10
+    },
+    {
+      "node_id": "app/main.py#5:run",
+      "label": "run()",
+      "source_file": "app/main.py",
+      "start_line": 5
+    },
+    {
+      "node_id": "app/models.py",
+      "label": "models.py",
+      "source_file": "app/models.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "app/models.py#10:build",
+      "label": "build()",
+      "source_file": "app/models.py",
+      "start_line": 10
+    },
+    {
+      "node_id": "app/models.py#1:Widget",
+      "label": "Widget",
+      "source_file": "app/models.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "app/models.py#2:build",
+      "label": "build()",
+      "source_file": "app/models.py",
+      "start_line": 2
+    },
+    {
+      "node_id": "app/models.py#5:size",
+      "label": "size()",
+      "source_file": "app/models.py",
+      "start_line": 5
+    },
+    {
+      "node_id": "app/models.py#9:Gadget",
+      "label": "Gadget",
+      "source_file": "app/models.py",
+      "start_line": 9
+    },
+    {
+      "node_id": "app/util.py",
+      "label": "util.py",
+      "source_file": "app/util.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "app/util.py#1:helper",
+      "label": "helper()",
+      "source_file": "app/util.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "app/util.py#5:caller",
+      "label": "caller()",
+      "source_file": "app/util.py",
+      "start_line": 5
+    }
+  ],
+  "edges": [
+    {
+      "source": "app/main.py",
+      "target": "app/main.py#10:run_bare",
+      "relation": "contains"
+    },
+    {
+      "source": "app/main.py",
+      "target": "app/main.py#5:run",
+      "relation": "contains"
+    },
+    {
+      "source": "app/main.py#5:run",
+      "target": "app/models.py#2:build",
+      "relation": "calls"
+    },
+    {
+      "source": "app/main.py#5:run",
+      "target": "app/util.py#5:caller",
+      "relation": "calls"
+    },
+    {
+      "source": "app/models.py",
+      "target": "app/models.py#1:Widget",
+      "relation": "contains"
+    },
+    {
+      "source": "app/models.py",
+      "target": "app/models.py#9:Gadget",
+      "relation": "contains"
+    },
+    {
+      "source": "app/models.py#1:Widget",
+      "target": "app/models.py#2:build",
+      "relation": "method"
+    },
+    {
+      "source": "app/models.py#1:Widget",
+      "target": "app/models.py#5:size",
+      "relation": "method"
+    },
+    {
+      "source": "app/models.py#2:build",
+      "target": "app/models.py#5:size",
+      "relation": "calls"
+    },
+    {
+      "source": "app/models.py#9:Gadget",
+      "target": "app/models.py#10:build",
+      "relation": "method"
+    },
+    {
+      "source": "app/util.py",
+      "target": "app/util.py#1:helper",
+      "relation": "contains"
+    },
+    {
+      "source": "app/util.py",
+      "target": "app/util.py#5:caller",
+      "relation": "contains"
+    },
+    {
+      "source": "app/util.py#5:caller",
+      "target": "app/util.py#1:helper",
+      "relation": "calls"
+    }
+  ]
+}

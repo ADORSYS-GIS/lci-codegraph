@@ -1,0 +1,176 @@
+{
+  "nodes": [
+    {
+      "node_id": "src/Button.jsx",
+      "label": "Button.jsx",
+      "source_file": "src/Button.jsx",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/Button.jsx#1:Button",
+      "label": "Button()",
+      "source_file": "src/Button.jsx",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/Button.jsx#5:App",
+      "label": "App()",
+      "source_file": "src/Button.jsx",
+      "start_line": 5
+    },
+    {
+      "node_id": "src/main.js",
+      "label": "main.js",
+      "source_file": "src/main.js",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main.js#4:run",
+      "label": "run()",
+      "source_file": "src/main.js",
+      "start_line": 4
+    },
+    {
+      "node_id": "src/main.js#9:runBare",
+      "label": "runBare()",
+      "source_file": "src/main.js",
+      "start_line": 9
+    },
+    {
+      "node_id": "src/util.js",
+      "label": "util.js",
+      "source_file": "src/util.js",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/util.js#1:helper",
+      "label": "helper()",
+      "source_file": "src/util.js",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/util.js#5:caller",
+      "label": "caller()",
+      "source_file": "src/util.js",
+      "start_line": 5
+    },
+    {
+      "node_id": "src/widgets.js",
+      "label": "widgets.js",
+      "source_file": "src/widgets.js",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/widgets.js#11:Gadget",
+      "label": "Gadget",
+      "source_file": "src/widgets.js",
+      "start_line": 11
+    },
+    {
+      "node_id": "src/widgets.js#12:build",
+      "label": "build()",
+      "source_file": "src/widgets.js",
+      "start_line": 12
+    },
+    {
+      "node_id": "src/widgets.js#1:Widget",
+      "label": "Widget",
+      "source_file": "src/widgets.js",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/widgets.js#2:build",
+      "label": "build()",
+      "source_file": "src/widgets.js",
+      "start_line": 2
+    },
+    {
+      "node_id": "src/widgets.js#6:size",
+      "label": "size()",
+      "source_file": "src/widgets.js",
+      "start_line": 6
+    }
+  ],
+  "edges": [
+    {
+      "source": "src/Button.jsx",
+      "target": "src/Button.jsx#1:Button",
+      "relation": "contains"
+    },
+    {
+      "source": "src/Button.jsx",
+      "target": "src/Button.jsx#5:App",
+      "relation": "contains"
+    },
+    {
+      "source": "src/Button.jsx#5:App",
+      "target": "src/Button.jsx#1:Button",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main.js",
+      "target": "src/main.js#4:run",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.js",
+      "target": "src/main.js#9:runBare",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.js#4:run",
+      "target": "src/util.js#5:caller",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main.js#4:run",
+      "target": "src/widgets.js#2:build",
+      "relation": "calls"
+    },
+    {
+      "source": "src/util.js",
+      "target": "src/util.js#1:helper",
+      "relation": "contains"
+    },
+    {
+      "source": "src/util.js",
+      "target": "src/util.js#5:caller",
+      "relation": "contains"
+    },
+    {
+      "source": "src/util.js#5:caller",
+      "target": "src/util.js#1:helper",
+      "relation": "calls"
+    },
+    {
+      "source": "src/widgets.js",
+      "target": "src/widgets.js#11:Gadget",
+      "relation": "contains"
+    },
+    {
+      "source": "src/widgets.js",
+      "target": "src/widgets.js#1:Widget",
+      "relation": "contains"
+    },
+    {
+      "source": "src/widgets.js#11:Gadget",
+      "target": "src/widgets.js#12:build",
+      "relation": "method"
+    },
+    {
+      "source": "src/widgets.js#1:Widget",
+      "target": "src/widgets.js#2:build",
+      "relation": "method"
+    },
+    {
+      "source": "src/widgets.js#1:Widget",
+      "target": "src/widgets.js#6:size",
+      "relation": "method"
+    },
+    {
+      "source": "src/widgets.js#2:build",
+      "target": "src/widgets.js#6:size",
+      "relation": "calls"
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "nodes": [
+    {
+      "node_id": "Main.java",
+      "label": "Main.java",
+      "source_file": "Main.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Main.java#1:Main",
+      "label": "Main",
+      "source_file": "Main.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Main.java#2:run",
+      "label": "run()",
+      "source_file": "Main.java",
+      "start_line": 2
+    },
+    {
+      "node_id": "Main.java#7:runBare",
+      "label": "runBare()",
+      "source_file": "Main.java",
+      "start_line": 7
+    },
+    {
+      "node_id": "Util.java",
+      "label": "Util.java",
+      "source_file": "Util.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Util.java#1:Util",
+      "label": "Util",
+      "source_file": "Util.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Util.java#2:helper",
+      "label": "helper()",
+      "source_file": "Util.java",
+      "start_line": 2
+    },
+    {
+      "node_id": "Util.java#6:caller",
+      "label": "caller()",
+      "source_file": "Util.java",
+      "start_line": 6
+    },
+    {
+      "node_id": "Widget.java",
+      "label": "Widget.java",
+      "source_file": "Widget.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Widget.java#11:Gadget",
+      "label": "Gadget",
+      "source_file": "Widget.java",
+      "start_line": 11
+    },
+    {
+      "node_id": "Widget.java#12:build",
+      "label": "build()",
+      "source_file": "Widget.java",
+      "start_line": 12
+    },
+    {
+      "node_id": "Widget.java#1:Widget",
+      "label": "Widget",
+      "source_file": "Widget.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Widget.java#2:build",
+      "label": "build()",
+      "source_file": "Widget.java",
+      "start_line": 2
+    },
+    {
+      "node_id": "Widget.java#6:size",
+      "label": "size()",
+      "source_file": "Widget.java",
+      "start_line": 6
+    }
+  ],
+  "edges": [
+    {
+      "source": "Main.java",
+      "target": "Main.java#1:Main",
+      "relation": "contains"
+    },
+    {
+      "source": "Main.java#1:Main",
+      "target": "Main.java#2:run",
+      "relation": "method"
+    },
+    {
+      "source": "Main.java#1:Main",
+      "target": "Main.java#7:runBare",
+      "relation": "method"
+    },
+    {
+      "source": "Main.java#2:run",
+      "target": "Util.java#6:caller",
+      "relation": "calls"
+    },
+    {
+      "source": "Main.java#2:run",
+      "target": "Widget.java#2:build",
+      "relation": "calls"
+    },
+    {
+      "source": "Util.java",
+      "target": "Util.java#1:Util",
+      "relation": "contains"
+    },
+    {
+      "source": "Util.java#1:Util",
+      "target": "Util.java#2:helper",
+      "relation": "method"
+    },
+    {
+      "source": "Util.java#1:Util",
+      "target": "Util.java#6:caller",
+      "relation": "method"
+    },
+    {
+      "source": "Util.java#6:caller",
+      "target": "Util.java#2:helper",
+      "relation": "calls"
+    },
+    {
+      "source": "Widget.java",
+      "target": "Widget.java#11:Gadget",
+      "relation": "contains"
+    },
+    {
+      "source": "Widget.java",
+      "target": "Widget.java#1:Widget",
+      "relation": "contains"
+    },
+    {
+      "source": "Widget.java#11:Gadget",
+      "target": "Widget.java#12:build",
+      "relation": "method"
+    },
+    {
+      "source": "Widget.java#1:Widget",
+      "target": "Widget.java#2:build",
+      "relation": "method"
+    },
+    {
+      "source": "Widget.java#1:Widget",
+      "target": "Widget.java#6:size",
+      "relation": "method"
+    },
+    {
+      "source": "Widget.java#2:build",
+      "target": "Widget.java#6:size",
+      "relation": "calls"
+    }
+  ]
+}

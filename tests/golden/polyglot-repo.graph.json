@@ -1,0 +1,297 @@
+{
+  "nodes": [
+    {
+      "node_id": "java/App.java",
+      "label": "App.java",
+      "source_file": "java/App.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "java/App.java#1:Helper",
+      "label": "Helper",
+      "source_file": "java/App.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "java/App.java#2:help",
+      "label": "help()",
+      "source_file": "java/App.java",
+      "start_line": 2
+    },
+    {
+      "node_id": "java/App.java#7:App",
+      "label": "App",
+      "source_file": "java/App.java",
+      "start_line": 7
+    },
+    {
+      "node_id": "java/App.java#8:run",
+      "label": "run()",
+      "source_file": "java/App.java",
+      "start_line": 8
+    },
+    {
+      "node_id": "python/main.py",
+      "label": "main.py",
+      "source_file": "python/main.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "python/main.py#10:run_bare",
+      "label": "run_bare()",
+      "source_file": "python/main.py",
+      "start_line": 10
+    },
+    {
+      "node_id": "python/main.py#5:run",
+      "label": "run()",
+      "source_file": "python/main.py",
+      "start_line": 5
+    },
+    {
+      "node_id": "python/models.py",
+      "label": "models.py",
+      "source_file": "python/models.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "python/models.py#10:build",
+      "label": "build()",
+      "source_file": "python/models.py",
+      "start_line": 10
+    },
+    {
+      "node_id": "python/models.py#1:Widget",
+      "label": "Widget",
+      "source_file": "python/models.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "python/models.py#2:build",
+      "label": "build()",
+      "source_file": "python/models.py",
+      "start_line": 2
+    },
+    {
+      "node_id": "python/models.py#5:size",
+      "label": "size()",
+      "source_file": "python/models.py",
+      "start_line": 5
+    },
+    {
+      "node_id": "python/models.py#9:Gadget",
+      "label": "Gadget",
+      "source_file": "python/models.py",
+      "start_line": 9
+    },
+    {
+      "node_id": "python/util.py",
+      "label": "util.py",
+      "source_file": "python/util.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "python/util.py#1:helper",
+      "label": "helper()",
+      "source_file": "python/util.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "python/util.py#5:caller",
+      "label": "caller()",
+      "source_file": "python/util.py",
+      "start_line": 5
+    },
+    {
+      "node_id": "rust/lib.rs",
+      "label": "lib.rs",
+      "source_file": "rust/lib.rs",
+      "start_line": 1
+    },
+    {
+      "node_id": "rust/lib.rs#1:add",
+      "label": "add()",
+      "source_file": "rust/lib.rs",
+      "start_line": 1
+    },
+    {
+      "node_id": "rust/lib.rs#5:compute",
+      "label": "compute()",
+      "source_file": "rust/lib.rs",
+      "start_line": 5
+    },
+    {
+      "node_id": "ts/main.ts",
+      "label": "main.ts",
+      "source_file": "ts/main.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "ts/main.ts#3:run",
+      "label": "run()",
+      "source_file": "ts/main.ts",
+      "start_line": 3
+    },
+    {
+      "node_id": "ts/service.ts",
+      "label": "service.ts",
+      "source_file": "ts/service.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "ts/service.ts#1:Client",
+      "label": "Client",
+      "source_file": "ts/service.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "ts/service.ts#2:fetch",
+      "label": "fetch()",
+      "source_file": "ts/service.ts",
+      "start_line": 2
+    },
+    {
+      "node_id": "ts/service.ts#6:parse",
+      "label": "parse()",
+      "source_file": "ts/service.ts",
+      "start_line": 6
+    }
+  ],
+  "edges": [
+    {
+      "source": "java/App.java",
+      "target": "java/App.java#1:Helper",
+      "relation": "contains"
+    },
+    {
+      "source": "java/App.java",
+      "target": "java/App.java#7:App",
+      "relation": "contains"
+    },
+    {
+      "source": "java/App.java#1:Helper",
+      "target": "java/App.java#2:help",
+      "relation": "method"
+    },
+    {
+      "source": "java/App.java#7:App",
+      "target": "java/App.java#8:run",
+      "relation": "method"
+    },
+    {
+      "source": "java/App.java#8:run",
+      "target": "java/App.java#2:help",
+      "relation": "calls"
+    },
+    {
+      "source": "python/main.py",
+      "target": "python/main.py#10:run_bare",
+      "relation": "contains"
+    },
+    {
+      "source": "python/main.py",
+      "target": "python/main.py#5:run",
+      "relation": "contains"
+    },
+    {
+      "source": "python/main.py#5:run",
+      "target": "python/models.py#2:build",
+      "relation": "calls"
+    },
+    {
+      "source": "python/main.py#5:run",
+      "target": "python/util.py#5:caller",
+      "relation": "calls"
+    },
+    {
+      "source": "python/models.py",
+      "target": "python/models.py#1:Widget",
+      "relation": "contains"
+    },
+    {
+      "source": "python/models.py",
+      "target": "python/models.py#9:Gadget",
+      "relation": "contains"
+    },
+    {
+      "source": "python/models.py#1:Widget",
+      "target": "python/models.py#2:build",
+      "relation": "method"
+    },
+    {
+      "source": "python/models.py#1:Widget",
+      "target": "python/models.py#5:size",
+      "relation": "method"
+    },
+    {
+      "source": "python/models.py#2:build",
+      "target": "python/models.py#5:size",
+      "relation": "calls"
+    },
+    {
+      "source": "python/models.py#9:Gadget",
+      "target": "python/models.py#10:build",
+      "relation": "method"
+    },
+    {
+      "source": "python/util.py",
+      "target": "python/util.py#1:helper",
+      "relation": "contains"
+    },
+    {
+      "source": "python/util.py",
+      "target": "python/util.py#5:caller",
+      "relation": "contains"
+    },
+    {
+      "source": "python/util.py#5:caller",
+      "target": "python/util.py#1:helper",
+      "relation": "calls"
+    },
+    {
+      "source": "rust/lib.rs",
+      "target": "rust/lib.rs#1:add",
+      "relation": "contains"
+    },
+    {
+      "source": "rust/lib.rs",
+      "target": "rust/lib.rs#5:compute",
+      "relation": "contains"
+    },
+    {
+      "source": "rust/lib.rs#5:compute",
+      "target": "rust/lib.rs#1:add",
+      "relation": "calls"
+    },
+    {
+      "source": "ts/main.ts",
+      "target": "ts/main.ts#3:run",
+      "relation": "contains"
+    },
+    {
+      "source": "ts/main.ts#3:run",
+      "target": "ts/service.ts#2:fetch",
+      "relation": "calls"
+    },
+    {
+      "source": "ts/service.ts",
+      "target": "ts/service.ts#1:Client",
+      "relation": "contains"
+    },
+    {
+      "source": "ts/service.ts#1:Client",
+      "target": "ts/service.ts#2:fetch",
+      "relation": "method"
+    },
+    {
+      "source": "ts/service.ts#1:Client",
+      "target": "ts/service.ts#6:parse",
+      "relation": "method"
+    },
+    {
+      "source": "ts/service.ts#2:fetch",
+      "target": "ts/service.ts#6:parse",
+      "relation": "calls"
+    }
+  ]
+}

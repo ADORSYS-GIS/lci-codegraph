@@ -1,0 +1,75 @@
+# cargo-deny configuration for lci-codegraph.
+#
+# Backs the `deny` job in `.github/workflows/ci.yml`: licence hygiene, security advisories,
+# banned/duplicate crates, and source provenance. Kept deliberately small — this is a pure
+# library with a narrow dependency surface (tree-sitter grammars, `ignore`, `pdf-extract` +
+# `flate2`, plus a Docker-backed dev-dependency tree for the `container-tests` suite) — rather
+# than carrying every section `cargo deny init` scaffolds.
+#
+# Regenerate the full commented template with `cargo deny init` if this ever needs rebuilding
+# from scratch; only the sections that diverge from cargo-deny's defaults are listed below.
+
+[graph]
+# Dev-dependencies (the container-test suite's Docker/rustls stack) are part of the graph too —
+# a licence or advisory problem there is still worth catching in CI, even though it never ships
+# in a published crate.
+all-features = true
+
+[advisories]
+# Deliberately NOT ignoring RUSTSEC-2026-0187 (lopdf: unbounded-recursion stack overflow on a
+# deeply nested PDF object graph, `SIGABRT`, not catchable by `catch_unwind`). lopdf reaches this
+# crate as a REAL runtime dependency via `pdf-extract`, in exactly the PDF-parsing path this
+# crate documents as untrusted input — see `src/pdf.rs`'s decompression-bomb guard, which this
+# advisory shows is not sufficient on its own. This must fail `cargo deny check` until
+# `pdf-extract`/`lopdf` are upgraded past 0.42.0 (currently resolves to lopdf 0.36.0); do not add
+# an ignore entry for it here without a corresponding fix landing in `src/`.
+ignore = [
+    # Unmaintained (not an exploit), reached ONLY through the `container-tests` dev-dependency
+    # chain (`neo4rs` -> `paste`) used by the Docker-backed Neo4j suite. Never shipped in the
+    # published crate. Re-check when `neo4rs` is next bumped.
+    { id = "RUSTSEC-2024-0436", reason = "paste is unmaintained; dev-only dependency of neo4rs (container-tests suite), not shipped in the published crate" },
+    # Unmaintained (not an exploit), reached ONLY through the `container-tests` dev-dependency
+    # chain (`neo4rs`/`testcontainers` -> `rustls-native-certs` -> `rustls-pemfile`). Never
+    # shipped in the published crate.
+    { id = "RUSTSEC-2025-0134", reason = "rustls-pemfile is unmaintained; dev-only dependency of neo4rs/testcontainers (container-tests suite), not shipped in the published crate" },
+    # Stack-exhaustion DoS parsing attacker-controlled RFC 2822 dates. Reached ONLY through the
+    # `container-tests` dev-dependency chain (`testcontainers` -> `bollard` -> `time`), talking
+    # to a local Docker daemon in CI, not attacker-reachable input. Never shipped in the
+    # published crate.
+    { id = "RUSTSEC-2026-0009", reason = "time RFC-2822 stack-exhaustion DoS; dev-only dependency of testcontainers/bollard (container-tests suite) talking to a local Docker daemon, not shipped in the published crate" },
+    # Unmaintained (not an exploit), reached ONLY through the `container-tests` dev-dependency
+    # chain (`neo4rs` -> `backoff`). Never shipped in the published crate.
+    { id = "RUSTSEC-2025-0012", reason = "backoff is unmaintained; dev-only dependency of neo4rs (container-tests suite), not shipped in the published crate" },
+    # Unmaintained (not an exploit), reached ONLY through the `container-tests` dev-dependency
+    # chain (`neo4rs` -> `backoff` -> `instant`). Never shipped in the published crate.
+    { id = "RUSTSEC-2024-0384", reason = "instant is unmaintained; dev-only dependency of neo4rs/backoff (container-tests suite), not shipped in the published crate" },
+]
+
+[licenses]
+# Permissive families only. Anything not listed here is DENIED by default (cargo-deny's
+# licenses.allow is an allow-list; an unlisted SPDX id fails the check) — that is the point: a
+# new transitive dependency pulling in a copyleft or otherwise unreviewed licence must fail CI,
+# not merge silently.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "0BSD",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+]
+confidence-threshold = 0.8
+
+[bans]
+# Duplicate versions are noise in a tree this size (tree-sitter grammars and the container-test
+# stack both drag in their own transitive graphs) — worth seeing, not worth failing CI over.
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

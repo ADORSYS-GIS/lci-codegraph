@@ -1,0 +1,143 @@
+{
+  "nodes": [
+    {
+      "node_id": "src/App.tsx",
+      "label": "App.tsx",
+      "source_file": "src/App.tsx",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/App.tsx#10:runBare",
+      "label": "runBare()",
+      "source_file": "src/App.tsx",
+      "start_line": 10
+    },
+    {
+      "node_id": "src/App.tsx#4:App",
+      "label": "App()",
+      "source_file": "src/App.tsx",
+      "start_line": 4
+    },
+    {
+      "node_id": "src/hooks.tsx",
+      "label": "hooks.tsx",
+      "source_file": "src/hooks.tsx",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/hooks.tsx#1:useThing",
+      "label": "useThing()",
+      "source_file": "src/hooks.tsx",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/hooks.tsx#5:useCaller",
+      "label": "useCaller()",
+      "source_file": "src/hooks.tsx",
+      "start_line": 5
+    },
+    {
+      "node_id": "src/widgets.tsx",
+      "label": "widgets.tsx",
+      "source_file": "src/widgets.tsx",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/widgets.tsx#11:Gadget",
+      "label": "Gadget",
+      "source_file": "src/widgets.tsx",
+      "start_line": 11
+    },
+    {
+      "node_id": "src/widgets.tsx#12:build",
+      "label": "build()",
+      "source_file": "src/widgets.tsx",
+      "start_line": 12
+    },
+    {
+      "node_id": "src/widgets.tsx#1:Widget",
+      "label": "Widget",
+      "source_file": "src/widgets.tsx",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/widgets.tsx#2:build",
+      "label": "build()",
+      "source_file": "src/widgets.tsx",
+      "start_line": 2
+    },
+    {
+      "node_id": "src/widgets.tsx#6:size",
+      "label": "size()",
+      "source_file": "src/widgets.tsx",
+      "start_line": 6
+    }
+  ],
+  "edges": [
+    {
+      "source": "src/App.tsx",
+      "target": "src/App.tsx#10:runBare",
+      "relation": "contains"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/App.tsx#4:App",
+      "relation": "contains"
+    },
+    {
+      "source": "src/App.tsx#4:App",
+      "target": "src/hooks.tsx#5:useCaller",
+      "relation": "calls"
+    },
+    {
+      "source": "src/App.tsx#4:App",
+      "target": "src/widgets.tsx#2:build",
+      "relation": "calls"
+    },
+    {
+      "source": "src/hooks.tsx",
+      "target": "src/hooks.tsx#1:useThing",
+      "relation": "contains"
+    },
+    {
+      "source": "src/hooks.tsx",
+      "target": "src/hooks.tsx#5:useCaller",
+      "relation": "contains"
+    },
+    {
+      "source": "src/hooks.tsx#5:useCaller",
+      "target": "src/hooks.tsx#1:useThing",
+      "relation": "calls"
+    },
+    {
+      "source": "src/widgets.tsx",
+      "target": "src/widgets.tsx#11:Gadget",
+      "relation": "contains"
+    },
+    {
+      "source": "src/widgets.tsx",
+      "target": "src/widgets.tsx#1:Widget",
+      "relation": "contains"
+    },
+    {
+      "source": "src/widgets.tsx#11:Gadget",
+      "target": "src/widgets.tsx#12:build",
+      "relation": "method"
+    },
+    {
+      "source": "src/widgets.tsx#1:Widget",
+      "target": "src/widgets.tsx#2:build",
+      "relation": "method"
+    },
+    {
+      "source": "src/widgets.tsx#1:Widget",
+      "target": "src/widgets.tsx#6:size",
+      "relation": "method"
+    },
+    {
+      "source": "src/widgets.tsx#2:build",
+      "target": "src/widgets.tsx#6:size",
+      "relation": "calls"
+    }
+  ]
+}

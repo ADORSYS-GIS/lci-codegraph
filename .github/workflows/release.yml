@@ -1,0 +1,160 @@
+# Publishes lci-codegraph to crates.io and cuts a matching GitHub Release on every `v*` tag push.
+#
+# ---------------------------------------------------------------------------------------------
+# BOOTSTRAP WARNING — read this before the first-ever release of this crate.
+#
+# crates.io Trusted Publishing (OIDC) CANNOT bootstrap a crate name that does not exist on the
+# registry yet: you can only attach a Trusted Publisher to a package that has already been
+# published at least once. This workflow authenticates with a plain `CARGO_REGISTRY_TOKEN`
+# secret (per the design brief) precisely because of that chicken-and-egg problem — but even a
+# token-based publish still needs the name reserved first if the org ever migrates this crate to
+# Trusted Publishing later. Concretely: the FIRST publish of `lci-codegraph` must be a manual,
+# token-authenticated `cargo publish` run from a maintainer's machine (or a one-off from this
+# workflow with a bootstrap token) to reserve the name on crates.io. Only after that first
+# publish exists can any subsequent automation — this workflow, or a Trusted Publisher — attach
+# to the crate at all. Skipping this and just pushing a tag against an empty crates.io namespace
+# will fail at the `cargo publish` step below with a registry-side error, not a workflow bug.
+#
+# Also note: `cargo publish --dry-run` (used as a gate below) does NOT catch everything a real
+# publish does — it skips the actual upload and the registry-side "already published"/"name
+# taken" checks, so a dry-run passing is necessary but not sufficient proof the real publish will
+# succeed.
+# ---------------------------------------------------------------------------------------------
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  # A release tag is never superseded by a newer push to the same ref (tags are immutable in
+  # practice here) — this just prevents two runs of the exact same tag racing each other.
+  cancel-in-progress: false
+
+jobs:
+  verify-version:
+    name: verify tag matches Cargo.toml
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tag must match Cargo.toml version
+        id: verify
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          cargo_version=$(grep -m1 '^version' Cargo.toml | sed -E 's/^version *= *"([^"]+)".*/\1/')
+          echo "Tag:          ${GITHUB_REF_NAME} (version $tag_version)"
+          echo "Cargo.toml:   $cargo_version"
+          if [ "$tag_version" != "$cargo_version" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match the version in Cargo.toml ($cargo_version). Refusing to publish — fix Cargo.toml or the tag and re-push."
+            exit 1
+          fi
+          echo "version=$cargo_version" >> "$GITHUB_OUTPUT"
+
+  gate:
+    name: fmt + clippy + test + dry-run
+    needs: verify-version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # branch: stable
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@63fed3e2fecf6f7b51dc6f043341b79ef82a9ae7 # v2.9.2
+        with:
+          workspaces: "."
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy -D warnings
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
+
+      - name: cargo test
+        run: cargo test --locked --all-targets
+
+      - name: cargo test --doc
+        run: cargo test --locked --doc
+
+      # Necessary-but-not-sufficient gate — see the bootstrap warning at the top of this file for
+      # what `--dry-run` does not catch.
+      - name: cargo publish --dry-run
+        run: cargo publish --dry-run --locked
+
+  publish:
+    name: cargo publish
+    needs: gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # branch: stable
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@63fed3e2fecf6f7b51dc6f043341b79ef82a9ae7 # v2.9.2
+        with:
+          workspaces: "."
+
+      - name: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --locked
+
+  github-release:
+    name: create GitHub release
+    needs: [verify-version, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # Pull the matching section out of CHANGELOG.md (Keep a Changelog format: `## [X.Y.Z] -
+      # date` headings). `notes_file` always ends up with *something* in it — a fallback message
+      # if no matching section is found, rather than failing the job outright. The crate is
+      # already published to crates.io by this point, so a changelog-formatting hiccup should
+      # not block cutting the release entry.
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          version="${{ needs.verify-version.outputs.version }}"
+          notes_file="$(mktemp)"
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="$version" '
+              $0 ~ "^## \\[" ver "\\]" { found=1; next }
+              found && /^## \[/ { exit }
+              found { print }
+            ' CHANGELOG.md > "$notes_file"
+          fi
+          # A missing section means only whitespace ended up in the file — fall back explicitly
+          # rather than publishing an empty release body.
+          if ! grep -q '[^[:space:]]' "$notes_file" 2>/dev/null; then
+            echo "::warning::No CHANGELOG.md section found for [$version]; using a fallback release body."
+            printf 'See [CHANGELOG.md](https://github.com/%s/blob/main/CHANGELOG.md) for details.\n' "$GITHUB_REPOSITORY" > "$notes_file"
+          fi
+          echo "notes_file=$notes_file" >> "$GITHUB_OUTPUT"
+
+      # v3.0.2, pinned to immutable reviewed code.
+      # Check for updates: https://github.com/softprops/action-gh-release/releases
+      - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          name: lci-codegraph ${{ github.ref_name }}
+          body_path: ${{ steps.notes.outputs.notes_file }}

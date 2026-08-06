@@ -1,0 +1,143 @@
+{
+  "nodes": [
+    {
+      "node_id": "src/main.ts",
+      "label": "main.ts",
+      "source_file": "src/main.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main.ts#4:run",
+      "label": "run()",
+      "source_file": "src/main.ts",
+      "start_line": 4
+    },
+    {
+      "node_id": "src/main.ts#9:runBare",
+      "label": "runBare()",
+      "source_file": "src/main.ts",
+      "start_line": 9
+    },
+    {
+      "node_id": "src/service.ts",
+      "label": "service.ts",
+      "source_file": "src/service.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/service.ts#11:Gadget",
+      "label": "Gadget",
+      "source_file": "src/service.ts",
+      "start_line": 11
+    },
+    {
+      "node_id": "src/service.ts#12:build",
+      "label": "build()",
+      "source_file": "src/service.ts",
+      "start_line": 12
+    },
+    {
+      "node_id": "src/service.ts#1:Widget",
+      "label": "Widget",
+      "source_file": "src/service.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/service.ts#2:build",
+      "label": "build()",
+      "source_file": "src/service.ts",
+      "start_line": 2
+    },
+    {
+      "node_id": "src/service.ts#6:size",
+      "label": "size()",
+      "source_file": "src/service.ts",
+      "start_line": 6
+    },
+    {
+      "node_id": "src/util.ts",
+      "label": "util.ts",
+      "source_file": "src/util.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/util.ts#1:helper",
+      "label": "helper()",
+      "source_file": "src/util.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/util.ts#5:caller",
+      "label": "caller()",
+      "source_file": "src/util.ts",
+      "start_line": 5
+    }
+  ],
+  "edges": [
+    {
+      "source": "src/main.ts",
+      "target": "src/main.ts#4:run",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.ts",
+      "target": "src/main.ts#9:runBare",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.ts#4:run",
+      "target": "src/service.ts#2:build",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main.ts#4:run",
+      "target": "src/util.ts#5:caller",
+      "relation": "calls"
+    },
+    {
+      "source": "src/service.ts",
+      "target": "src/service.ts#11:Gadget",
+      "relation": "contains"
+    },
+    {
+      "source": "src/service.ts",
+      "target": "src/service.ts#1:Widget",
+      "relation": "contains"
+    },
+    {
+      "source": "src/service.ts#11:Gadget",
+      "target": "src/service.ts#12:build",
+      "relation": "method"
+    },
+    {
+      "source": "src/service.ts#1:Widget",
+      "target": "src/service.ts#2:build",
+      "relation": "method"
+    },
+    {
+      "source": "src/service.ts#1:Widget",
+      "target": "src/service.ts#6:size",
+      "relation": "method"
+    },
+    {
+      "source": "src/service.ts#2:build",
+      "target": "src/service.ts#6:size",
+      "relation": "calls"
+    },
+    {
+      "source": "src/util.ts",
+      "target": "src/util.ts#1:helper",
+      "relation": "contains"
+    },
+    {
+      "source": "src/util.ts",
+      "target": "src/util.ts#5:caller",
+      "relation": "contains"
+    },
+    {
+      "source": "src/util.ts#5:caller",
+      "target": "src/util.ts#1:helper",
+      "relation": "calls"
+    }
+  ]
+}

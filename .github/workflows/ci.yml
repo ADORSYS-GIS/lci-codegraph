@@ -1,0 +1,231 @@
+# Main CI gate for lci-codegraph: everything that must be green before a PR merges to `main`.
+#
+# Why this exists: this crate is headed for a real crates.io / docs.rs release, so the bar is
+# "would this pass `cargo publish` and `docs.rs` today" — not just "does it compile". Seven
+# independent jobs, each catching a different class of regression a plain `cargo build` misses:
+# formatting/lint drift, the actual test suite, the MSRV floor the crate advertises in
+# `Cargo.toml`, a line-coverage floor, a broken rustdoc link (fatal on docs.rs, not just here),
+# dependency licence/advisory/source hygiene, and a broken package manifest. All run on
+# GitHub-hosted `ubuntu-latest` runners — this crate has no self-hosted-runner dependency, and
+# the Docker-backed suites (see container-tests.yml) need a real host Docker daemon that
+# GitHub-hosted runners provide out of the box.
+#
+# Deliberately NOT run here: the `container-tests` feature's Docker-backed suites
+# (container_neo4j / container_build / container_repos). They are slow (spin up real containers)
+# and covered by the separate container-tests.yml workflow instead.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the same ref supersedes an in-flight run — applies to every job below, since
+# they all run out of this one workflow.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      # dtolnay/rust-toolchain, pinned to the `stable` branch's HEAD commit as of the last time
+      # this workflow was updated (no versioned releases exist for this action).
+      # Check for updates: https://github.com/dtolnay/rust-toolchain
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # branch: stable
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+
+      # Caches ~/.cargo and target/ keyed on Cargo.lock. The tree-sitter grammars (C sources
+      # compiled via `cc` build scripts in tree-sitter-{rust,javascript,typescript,python,java})
+      # are the single most expensive thing to rebuild in this crate's graph — this cache is the
+      # biggest win in the whole workflow.
+      # v2.9.2, check for updates: https://github.com/Swatinem/rust-cache/releases
+      - uses: Swatinem/rust-cache@63fed3e2fecf6f7b51dc6f043341b79ef82a9ae7 # v2.9.2
+        with:
+          workspaces: "."
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy -D warnings
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # branch: stable
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@63fed3e2fecf6f7b51dc6f043341b79ef82a9ae7 # v2.9.2
+        with:
+          workspaces: "."
+
+      # Default feature set deliberately excludes the Docker-backed suites (they sit behind the
+      # `container-tests` feature — see tests/container_{neo4j,build,repos}.rs and
+      # container-tests.yml), so this needs no Docker daemon.
+      - name: cargo test (lib + integration)
+        run: cargo test --locked --all-targets
+
+      - name: cargo test --doc
+        run: cargo test --locked --doc
+
+  msrv:
+    name: msrv
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      # Read the MSRV out of Cargo.toml itself rather than hardcoding it a second time here —
+      # a bumped `rust-version` should not also require editing this workflow.
+      - name: Read MSRV from Cargo.toml
+        id: msrv
+        run: |
+          version=$(grep -m1 '^rust-version' Cargo.toml | sed -E 's/^rust-version *= *"([^"]+)".*/\1/')
+          if [ -z "$version" ]; then
+            echo "::error::Could not read rust-version from Cargo.toml"
+            exit 1
+          fi
+          echo "Cargo.toml rust-version: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # branch: stable
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+
+      - uses: Swatinem/rust-cache@63fed3e2fecf6f7b51dc6f043341b79ef82a9ae7 # v2.9.2
+        with:
+          workspaces: "."
+
+      - name: cargo check on MSRV toolchain
+        run: cargo check --locked
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # branch: stable
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+
+      - uses: Swatinem/rust-cache@63fed3e2fecf6f7b51dc6f043341b79ef82a9ae7 # v2.9.2
+        with:
+          workspaces: "."
+
+      # v2.59.1, pinned to immutable reviewed code; checksums stay enabled explicitly.
+      # Check for updates: https://github.com/taiki-e/install-action/releases
+      - uses: taiki-e/install-action@57511bcdf8cdb0eab6448cb7fa632952d9f25742 # v2.59.1
+        with:
+          tool: cargo-llvm-cov@0.8.7
+          checksum: true
+
+      # Floor calibrated empirically against this crate's actual suite (measured 88-95% line
+      # coverage across the unit + `tests/parity.rs` integration suite while this workflow was
+      # authored — the number moved as concurrent PRs landed more tests, hence the wide observed
+      # band). 85% sits comfortably below the whole observed range, so it catches a real
+      # coverage regression without being a tripwire for normal week-to-week movement. Container
+      # tests (behind `container-tests`, see container-tests.yml) are intentionally excluded —
+      # this floor is for the suite that runs on every PR, without a Docker daemon.
+      - name: cargo llvm-cov --fail-under-lines 85
+        run: cargo llvm-cov --locked --all-targets --summary-only --fail-under-lines 85
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      # Promote a broken intra-doc link to a hard CI failure. This crate is headed for docs.rs,
+      # where a broken link degrades the published docs silently — catch it here instead.
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # branch: stable
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@63fed3e2fecf6f7b51dc6f043341b79ef82a9ae7 # v2.9.2
+        with:
+          workspaces: "."
+
+      - name: cargo doc --all-features
+        run: cargo doc --no-deps --all-features
+
+  deny:
+    name: deny
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # branch: stable
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@63fed3e2fecf6f7b51dc6f043341b79ef82a9ae7 # v2.9.2
+        with:
+          workspaces: "."
+
+      # v2.59.1, pinned to immutable reviewed code; checksums stay enabled explicitly.
+      # Check for updates: https://github.com/taiki-e/install-action/releases
+      - uses: taiki-e/install-action@57511bcdf8cdb0eab6448cb7fa632952d9f25742 # v2.59.1
+        with:
+          tool: cargo-deny@0.19.9
+          checksum: true
+
+      # Config lives in /deny.toml at the repo root. Checks licences (allow-list of permissive
+      # families, deny-by-default otherwise), security/unmaintained advisories, banned/duplicate
+      # crates, and source provenance (crates.io only, no arbitrary git deps).
+      - name: cargo deny check
+        run: cargo deny --locked check
+
+  package:
+    name: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # branch: stable
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@63fed3e2fecf6f7b51dc6f043341b79ef82a9ae7 # v2.9.2
+        with:
+          workspaces: "."
+
+      # The cheapest possible guard against a bad first `cargo publish`: catches a broken
+      # `exclude`/`include`, a missing `readme`/`license-file`, or a manifest that plain
+      # `cargo build` would never notice is wrong. Neither of these steps uploads anything.
+      - name: cargo package --list
+        run: cargo package --list --locked
+
+      - name: cargo publish --dry-run
+        run: cargo publish --dry-run --locked
