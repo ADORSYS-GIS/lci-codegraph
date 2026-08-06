@@ -15,8 +15,10 @@
 //! **Slow.** Each variant: cold, this is an image pull (rust:slim-bookworm ~800MB, rust:alpine
 //! ~200MB) plus a full `cargo build` of every dependency including compiling each tree-sitter
 //! grammar's C sources — multiple minutes. A named Docker volume caches the Cargo registry AND the
-//! target dir across repeat runs (`lci-codegraph-container-build-{cargo-registry,target-<variant>}`)
-//! so a second local run is much faster than the first; CI has no such warm cache.
+//! target dir across repeat runs
+//! (`lci-codegraph-container-build-{cargo-registry,target}-<variant>`) so a second local run is much
+//! faster than the first; CI has no such warm cache. Both volumes are per-variant — see
+//! [`cargo_registry_volume`] for why sharing the registry across the two concurrent variants breaks.
 
 #[path = "support/mod.rs"]
 mod support;
@@ -28,7 +30,21 @@ use std::time::{Duration, Instant};
 /// (incl. every tree-sitter C grammar) from scratch into a fresh volume.
 const BUILD_TIMEOUT: Duration = Duration::from_secs(900);
 
-const CARGO_REGISTRY_VOLUME: &str = "lci-codegraph-container-build-cargo-registry";
+/// Registry cache volume name for a variant. This is deliberately **per-variant**, not shared.
+///
+/// A single shared registry volume looks like the obvious win (the two variants download the exact
+/// same crates), and it is what this test originally did — but the variants run CONCURRENTLY under
+/// the default `cargo test` thread pool, and two `cargo` processes unpacking into the same registry
+/// directory from separate containers race: the loser dies with
+/// `failed to unpack package ... failed to open '.cargo-ok': File exists (os error 17)`.
+/// Cargo's package-cache lock does not save us across independently-mounted containers.
+///
+/// This only reproduces under parallel execution, so it passes locally under `--test-threads=1` and
+/// fails in CI, which runs plain `cargo test`. Isolating the volumes costs one extra registry
+/// download on a cold run and keeps the two variants genuinely parallel.
+fn cargo_registry_volume(variant: &str) -> String {
+    format!("lci-codegraph-container-build-cargo-registry-{variant}")
+}
 
 struct BuildOutcome {
     graph: support::GraphJson,
@@ -50,6 +66,7 @@ fn build_and_run_variant(
     let crate_root = support::crate_root();
     let output_dir = tempfile::tempdir().expect("tempdir for container output");
     let target_volume = format!("lci-codegraph-container-build-target-{variant}");
+    let registry_volume = cargo_registry_volume(variant);
 
     let script = format!(
         "set -e\n\
@@ -69,7 +86,7 @@ fn build_and_run_variant(
         "-v",
         &format!("{}:/workspace-ro:ro", crate_root.display()),
         "-v",
-        &format!("{CARGO_REGISTRY_VOLUME}:/usr/local/cargo/registry"),
+        &format!("{registry_volume}:/usr/local/cargo/registry"),
         "-v",
         &format!("{target_volume}:/cargo-target"),
         "-v",
