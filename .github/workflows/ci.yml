@@ -138,7 +138,7 @@ jobs:
 
       # v2.59.1, pinned to immutable reviewed code; checksums stay enabled explicitly.
       # Check for updates: https://github.com/taiki-e/install-action/releases
-      - uses: taiki-e/install-action@57511bcdf8cdb0eab6448cb7fa632952d9f25742 # v2.59.1
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
         with:
           tool: cargo-llvm-cov@0.8.7
           checksum: true
@@ -194,7 +194,7 @@ jobs:
 
       # v2.59.1, pinned to immutable reviewed code; checksums stay enabled explicitly.
       # Check for updates: https://github.com/taiki-e/install-action/releases
-      - uses: taiki-e/install-action@57511bcdf8cdb0eab6448cb7fa632952d9f25742 # v2.59.1
+      - uses: taiki-e/install-action@67729d5c413db75907f0ad1e39bb04b9c868ff60 # v2.85.7
         with:
           tool: cargo-deny@0.19.9
           checksum: true
