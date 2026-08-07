@@ -95,20 +95,15 @@ fn valid_utf8_binary_looking_content_with_a_source_extension_does_not_panic() {
 }
 
 #[test]
-fn build_graph_path_leaks_raw_nul_bytes_into_a_window_chunk_flagged_not_fixed() {
-    // REAL BUG, confirmed by inspection and deliberately NOT fixed here (out of scope for a
-    // black-box test suite — `src/**` is off limits for this change): `chunk_file` explicitly
-    // rejects binary content by scanning the first 512 bytes for a NUL (`src/chunk.rs`,
-    // `chunk_file`). But `walk_checkout`'s graph-enabled branch (`build_graph == true` and the
-    // language `has_graph`) never calls `chunk_file` — it parses the tree once and, when tree-sitter
-    // finds no "interesting" definitions at all (as here: no recognizable Rust syntax), falls back
-    // directly to `chunk::chunk_text` → `window_chunks`, which has NO binary/NUL guard at all. The
-    // result: a byte-for-byte binary blob (as long as it happens to be valid UTF-8 — NUL is a legal
-    // codepoint) with a graphed-language extension gets windowed into a chunk whose `content` field
-    // contains raw NUL bytes, something `chunk_file` (the non-graph path, and `chunk_file` called
-    // directly) would have rejected outright. This is a real behavioural gap between the two chunking
-    // entry points, not a crash — the walk completes fine — so it's asserted here as CURRENT
-    // behaviour, not desired behaviour.
+fn build_graph_path_rejects_a_nul_laden_blob_exactly_as_chunk_file_does() {
+    // REGRESSION TEST for the bug this replaces. `chunk_file` has always rejected binary content by
+    // scanning the first 512 bytes for a NUL, but `walk_checkout`'s graph-enabled branch never calls
+    // `chunk_file` — it parses the tree itself and, when tree-sitter finds no interesting definitions
+    // (as here: no recognisable Rust syntax), falls back straight to `chunk_text` -> `window_chunks`,
+    // which had no guard at all. A binary blob that happens to be valid UTF-8 (NUL is a legal
+    // codepoint) therefore got windowed with raw NUL bytes in `Chunk::content` — on the ONE path
+    // production actually runs. The two entry points now agree: the guard sits where the chunk is
+    // produced, so it cannot be bypassed by choosing a different door.
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     let garbage: Vec<u8> = vec![0u8, 1, 2, 3, 0u8, 5, 6, 0u8];
@@ -117,23 +112,26 @@ fn build_graph_path_leaks_raw_nul_bytes_into_a_window_chunk_flagged_not_fixed() 
     let options = WalkOptions::builder().build_graph(true).build();
     let out = walk_checkout(root, &options).unwrap();
 
-    let chunk = out
-        .chunks
-        .iter()
-        .find(|c| c.file_path == "src/garbage.rs")
-        .expect(
-            "current behaviour: the NUL-laden blob IS chunked on the build_graph path, unlike \
-             chunk_file's binary guard would allow",
-        );
-    assert_eq!(chunk.chunk_type, "window");
     assert!(
-        chunk.content.contains('\0'),
-        "current behaviour: raw NUL bytes end up in chunk content: {:?}",
-        chunk.content
+        !chunked(&out.chunks, "src/garbage.rs"),
+        "binary blob must not be chunked on the build_graph path: {:?}",
+        out.chunks
+    );
+    assert!(
+        !out.chunks.iter().any(|c| c.content.contains('\0')),
+        "no chunk may carry a raw NUL byte (PostgreSQL `text` rejects it outright)"
     );
 
-    // Contrast: the SAME bytes through `chunk_file` directly (the path a non-graphed language, or
-    // `build_graph == false`, actually takes) are correctly rejected as binary.
+    // A skipped binary file is COUNTED, not silently vanished: without this an operator cannot
+    // tell "this repo has fewer indexable files than expected" from "a binary asset is misnamed
+    // with a source extension", and only the second is actionable.
+    assert_eq!(
+        out.stats.files_skipped_binary, 1,
+        "the binary skip must be visible in WalkStats: {:?}",
+        out.stats
+    );
+
+    // The two entry points must agree about identical bytes — that agreement is the actual fix.
     let direct = lci_codegraph::chunk_file(
         "src/garbage.rs",
         std::str::from_utf8(&garbage).unwrap(),
@@ -142,7 +140,40 @@ fn build_graph_path_leaks_raw_nul_bytes_into_a_window_chunk_flagged_not_fixed() 
     );
     assert!(
         direct.is_empty(),
-        "chunk_file's binary guard rejects the same bytes; chunk_tree/window_chunks does not"
+        "chunk_file and the graph-enabled walk must reach the same verdict on the same bytes"
+    );
+}
+
+#[test]
+fn binary_blob_is_kept_out_of_the_graph_too_not_just_the_chunks() {
+    // The guard runs in the walk BEFORE either consumer, so a binary blob never reaches the graph
+    // builder either. Guarding only inside the chunker would have left tree-sitter parsing garbage
+    // into `:Symbol` nodes.
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let mut body = vec![0u8, 0u8];
+    // Real, parseable Rust *after* the NUL prefix: without a content-based guard this would emit a
+    // perfectly ordinary-looking `victim()` node sourced from a file that is actually binary.
+    body.extend_from_slice(b"fn victim() {}\n");
+    common::write_bytes(root, "src/blob.rs", &body);
+    common::write(root, "src/real.rs", "fn real() {}\n");
+
+    let options = WalkOptions::builder().build_graph(true).build();
+    let out = walk_checkout(root, &options).unwrap();
+
+    assert!(
+        !out.graph
+            .nodes
+            .iter()
+            .any(|n| n.source_file == "src/blob.rs"),
+        "binary file contributed graph nodes: {:?}",
+        out.graph.nodes
+    );
+    // ...and a clean file in the same walk is unaffected.
+    assert!(
+        out.graph.nodes.iter().any(|n| n.label == "real()"),
+        "the clean sibling must still be extracted: {:?}",
+        out.graph.nodes
     );
 }
 

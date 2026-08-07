@@ -115,8 +115,13 @@ fn walk(
                 source_file: source_file.to_string(),
                 start_line,
             });
-            // Functions/methods are callable — record for resolution, tagged with their type scope.
-            if is_callable && let Some(n) = name.clone() {
+            // Record for resolution, tagged with type scope. Note this is `is_call_target`, NOT
+            // `is_callable`: a bodiless trait method is callable-shaped (it earned the `()` label
+            // and the `method` edge above) but must not compete with its own implementations for
+            // the name — see `Classifier::is_call_target`.
+            if classifier.is_call_target(&child, kind)
+                && let Some(n) = name.clone()
+            {
                 facts.callables.push(Callable {
                     name: n,
                     node_id: node_id.clone(),
@@ -196,6 +201,33 @@ impl Classifier<'_> {
                 .defs
                 .get(&node.id())
                 .map(|def| (def.kind, def.name.clone())),
+        }
+    }
+
+    /// Whether a definition is a **call target** — something a call site may resolve to.
+    ///
+    /// This is deliberately narrower than "is callable-shaped". A callable-shaped def gets the `()`
+    /// label suffix and a `method` edge; a *call target* additionally competes for a name in
+    /// [`super::resolve::resolve`]. A trait method DECLARATION is the first but not the second: a
+    /// call dispatches to an implementation, never to the declaration.
+    ///
+    /// Keeping declarations out of the candidate set is load-bearing, not tidiness. The resolver is
+    /// precision-favouring — several same-named candidates with no disambiguating qualifier are
+    /// dropped, not fanned out. A trait with exactly one impl would otherwise go from one candidate
+    /// to two the moment declarations were indexed, and every call to that method would stop
+    /// resolving. Fixing the missing-symbol bug would then have silently deleted `calls` edges.
+    fn is_call_target(self, node: &Node<'_>, kind: &str) -> bool {
+        if !matches!(kind, "function" | "method") {
+            return false;
+        }
+        match self {
+            // The one Rust node kind that is callable-shaped but bodiless.
+            Classifier::Rust => node.kind() != "function_signature_item",
+            // Tags-driven languages capture definitions, and an abstract/interface method that the
+            // grammar's `tags.scm` reports is still reported as a definition; leave them as targets
+            // rather than guess per-grammar. Revisit if a language shows the same duplicate-name
+            // regression Rust would have had.
+            Classifier::Tagged(_) => true,
         }
     }
 
@@ -329,9 +361,7 @@ mod tests {
 
     #[test]
     fn trait_container_emits_a_method_edge_for_its_fn() {
-        // A default-bodied trait method: interesting_node only classifies `function_item`, which is
-        // what a body-bearing method parses as. (A signature-only `fn f(&self);` parses as
-        // `function_signature_item` and is NOT classified at all — see the crate-level bug report.)
+        // A default-bodied trait method (`function_item`).
         let src = "trait T {\n    fn f(&self) {}\n}\n";
         let facts = facts_for("rust", "src/t.rs", src);
         let trait_node = facts.nodes.iter().find(|n| n.label == "T").unwrap();
@@ -342,6 +372,72 @@ mod tests {
                 && e.target == f.node_id),
             "trait → f must be a `method` edge; got {:?}",
             facts.contains
+        );
+    }
+
+    #[test]
+    fn signature_only_trait_method_is_a_node_with_a_method_edge() {
+        // REGRESSION: a trait method with no default body parses as `function_signature_item`, not
+        // `function_item`, and used to be classified as nothing at all — so a trait interface
+        // contributed zero callable symbols to the graph or to semantic search.
+        let src = "trait T {\n    fn f(&self);\n}\n";
+        let facts = facts_for("rust", "src/t.rs", src);
+        let trait_node = facts.nodes.iter().find(|n| n.label == "T").unwrap();
+        let f = facts
+            .nodes
+            .iter()
+            .find(|n| n.label == "f()")
+            .expect("signature-only trait method must produce a node");
+        assert_eq!(f.start_line, 2);
+        assert!(
+            facts.contains.iter().any(|e| e.relation == "method"
+                && e.source == trait_node.node_id
+                && e.target == f.node_id),
+            "trait → f must be a `method` edge; got {:?}",
+            facts.contains
+        );
+    }
+
+    #[test]
+    fn signature_only_trait_method_is_not_a_call_target() {
+        // It is callable-SHAPED (it earned the `()` label and the `method` edge above) but must not
+        // enter the resolver's candidate set: a call dispatches to an implementation, never to the
+        // declaration. See `Classifier::is_call_target`.
+        let src = "trait T {\n    fn f(&self);\n}\n";
+        let facts = facts_for("rust", "src/t.rs", src);
+        assert!(
+            facts.callables.is_empty(),
+            "a bodiless declaration must not be a call target; got {:?}",
+            facts.callables
+        );
+    }
+
+    #[test]
+    fn a_bodied_method_next_to_its_declaration_is_still_the_only_call_target() {
+        // The whole reason declarations are excluded from the candidate set. A trait with exactly
+        // ONE impl would otherwise go from one candidate to two the moment declarations were
+        // indexed, and the precision-favouring resolver would drop every call to that method —
+        // so fixing the missing-symbol bug would have silently deleted `calls` edges.
+        let src = "trait T {\n    fn f(&self);\n}\n\
+                   struct S;\n\
+                   impl T for S {\n    fn f(&self) {}\n}\n";
+        let facts = facts_for("rust", "src/t.rs", src);
+        let targets: Vec<_> = facts.callables.iter().map(|c| c.node_id.as_str()).collect();
+        assert_eq!(
+            targets.len(),
+            1,
+            "exactly one call target (the impl) must survive; got {targets:?}"
+        );
+        assert!(
+            targets[0].ends_with(":f"),
+            "the surviving target must be the bodied impl method; got {targets:?}"
+        );
+        // Both defs still exist as nodes — the declaration is indexed, just not dispatched to.
+        assert_eq!(
+            facts.nodes.iter().filter(|n| n.label == "f()").count(),
+            2,
+            "declaration and implementation must BOTH be nodes; got {:?}",
+            facts.nodes
         );
     }
 
