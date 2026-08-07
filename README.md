@@ -1,6 +1,6 @@
 # lci-codegraph
 
-[![CI](https://github.com/vymalo/codegraph/actions/workflows/ci.yml/badge.svg)](https://github.com/vymalo/codegraph/actions/workflows/ci.yml)
+[![CI](https://github.com/vymalo/lci-codegraph/actions/workflows/ci.yml/badge.svg)](https://github.com/vymalo/lci-codegraph/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/lci-codegraph.svg)](https://crates.io/crates/lci-codegraph)
 [![docs.rs](https://img.shields.io/docsrs/lci-codegraph)](https://docs.rs/lci-codegraph)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)

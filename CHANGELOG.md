@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI covering fmt, clippy, tests, MSRV, coverage floor, rustdoc, `cargo-deny` and a publish
   dry-run, plus a tag-driven crates.io release workflow
 
+### Fixed
+
+- Rust trait methods declared without a default body (`fn greet(&self);`) are now extracted. They
+  parse as `function_signature_item` rather than `function_item` and were previously classified as
+  nothing at all, so a trait interface produced no graph node and no chunk — invisible to both
+  structural and semantic search. Such declarations are indexed as definitions but deliberately are
+  **not** call targets: a call dispatches to an implementation, and letting declarations compete for
+  the same name would have made every single-impl trait method call ambiguous, and therefore dropped.
+- Binary content can no longer reach chunk output. The NUL sniff lived only in `chunk_file`, which
+  the graph-enabled walk never calls, so a binary blob that happens to be valid UTF-8 was windowed
+  with raw NUL bytes in `Chunk::content`. The guard now sits where a chunk is produced and in the
+  walk ahead of both consumers, so the graph no longer ingests binary content either. Skipped files
+  are reported via the new `WalkStats::files_skipped_binary` counter instead of vanishing.
+
 ### Security
 
 - `pdf-extract` is floored at 0.12, the first release depending on `lopdf >= 0.42`, which patches
@@ -35,4 +49,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deeply nested PDF objects that aborts the process with `SIGABRT`. Because that is an abort and
   not a panic, the crate's `catch_unwind` guard could not contain it.
 
-[0.1.0]: https://github.com/vymalo/codegraph/releases/tag/v0.1.0
+[0.1.0]: https://github.com/vymalo/lci-codegraph/releases/tag/v0.1.0
