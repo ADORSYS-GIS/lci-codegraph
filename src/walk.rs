@@ -48,6 +48,13 @@ pub struct WalkStats {
     pub paths_ignored: usize,
     pub pdfs_extracted: usize,
     pub pdfs_skipped: usize,
+    /// Files rejected as binary by the content sniff (a NUL byte in the first 512 bytes), despite
+    /// decoding as valid UTF-8 and carrying an indexable extension.
+    ///
+    /// Counted rather than silently dropped: without it, "this repo has fewer indexable files than
+    /// I expected" and "a generated/binary asset is misnamed with a source extension" look exactly
+    /// the same from the summary line — and the second is an actionable repo problem.
+    pub files_skipped_binary: usize,
 }
 
 /// The output of a walk: chunks to embed and the resolved structural graph.
@@ -161,6 +168,8 @@ pub fn walk_checkout(root: &Path, options: &WalkOptions) -> anyhow::Result<WalkO
         // a binary blob can decode as valid UTF-8 above and still be junk. Rejected here — before
         // either consumer — so the graph never ingests it either, not just the chunker.
         if chunk::is_binary(&source) {
+            tracing::debug!(path = %rel_path, "codegraph: binary content, skipped");
+            stats.files_skipped_binary += 1;
             continue;
         }
 
@@ -199,6 +208,7 @@ pub fn walk_checkout(root: &Path, options: &WalkOptions) -> anyhow::Result<WalkO
         graph_nodes = graph.nodes.len(),
         graph_edges = graph.edges.len(),
         paths_ignored = stats.paths_ignored,
+        files_skipped_binary = stats.files_skipped_binary,
         pdfs_extracted = stats.pdfs_extracted,
         pdfs_skipped = stats.pdfs_skipped,
         "codegraph: walk complete"

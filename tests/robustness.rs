@@ -122,6 +122,15 @@ fn build_graph_path_rejects_a_nul_laden_blob_exactly_as_chunk_file_does() {
         "no chunk may carry a raw NUL byte (PostgreSQL `text` rejects it outright)"
     );
 
+    // A skipped binary file is COUNTED, not silently vanished: without this an operator cannot
+    // tell "this repo has fewer indexable files than expected" from "a binary asset is misnamed
+    // with a source extension", and only the second is actionable.
+    assert_eq!(
+        out.stats.files_skipped_binary, 1,
+        "the binary skip must be visible in WalkStats: {:?}",
+        out.stats
+    );
+
     // The two entry points must agree about identical bytes — that agreement is the actual fix.
     let direct = lci_codegraph::chunk_file(
         "src/garbage.rs",
