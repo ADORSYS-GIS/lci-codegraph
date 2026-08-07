@@ -157,6 +157,12 @@ pub fn walk_checkout(root: &Path, options: &WalkOptions) -> anyhow::Result<WalkO
         if source.len() > MAX_FILE_BYTES {
             continue; // over the byte cap
         }
+        // Binary content, caught by CONTENT rather than encoding: NUL is a legal Unicode scalar, so
+        // a binary blob can decode as valid UTF-8 above and still be junk. Rejected here — before
+        // either consumer — so the graph never ingests it either, not just the chunker.
+        if chunk::is_binary(&source) {
+            continue;
+        }
 
         let file_chunks = if options.build_graph && lang::has_graph(language) {
             // Parse ONCE and feed both the chunker and the graph builder (ADR-0086 "parse once").

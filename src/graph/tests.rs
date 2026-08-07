@@ -651,3 +651,53 @@ class Builder { Object build() { return Circle.make(); } }
         "→ Circle.make only"
     );
 }
+
+#[test]
+fn a_call_to_a_single_impl_trait_method_still_resolves_to_the_impl() {
+    // The end-to-end guard for the decision in `Classifier::is_call_target`. Indexing trait method
+    // DECLARATIONS as nodes (so trait interfaces are searchable) must not make them compete with
+    // their own implementations for the name: the resolver is precision-favouring and drops a bare
+    // name matching several candidates. If declarations were call targets, this call would go from
+    // one candidate to two and the `calls` edge below would silently disappear.
+    let g = graph_of(&[
+        (
+            "src/shape.rs",
+            "trait Shape {\n    fn describe(&self) -> f64;\n}\n",
+        ),
+        (
+            "src/circle.rs",
+            "struct Circle;\nimpl Shape for Circle {\n    fn describe(&self) -> f64 {\n        1.0\n    }\n}\n",
+        ),
+        (
+            "src/main.rs",
+            "fn run(c: &Circle) -> f64 {\n    c.describe()\n}\n",
+        ),
+    ]);
+
+    // Both the declaration and the implementation are indexed as nodes.
+    let describes: Vec<&GraphNode> = g.nodes.iter().filter(|n| n.label == "describe()").collect();
+    assert_eq!(
+        describes.len(),
+        2,
+        "declaration and implementation must both be nodes; got {describes:?}"
+    );
+    assert!(describes.iter().any(|n| n.source_file == "src/shape.rs"));
+
+    // ...but the call resolves, and resolves to the IMPLEMENTATION, not the declaration.
+    let caller = node(&g, "run()").node_id.clone();
+    let targets: Vec<&str> = g
+        .edges
+        .iter()
+        .filter(|e| e.relation == "calls" && e.source == caller)
+        .map(|e| e.target.as_str())
+        .collect();
+    assert_eq!(
+        targets.len(),
+        1,
+        "the call must still resolve to exactly one target; got {targets:?}"
+    );
+    assert!(
+        targets[0].starts_with("src/circle.rs"),
+        "must resolve to the impl in circle.rs, not the declaration; got {targets:?}"
+    );
+}

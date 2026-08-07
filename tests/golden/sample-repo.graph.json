@@ -79,6 +79,12 @@
       "start_line": 30
     },
     {
+      "node_id": "src/shapes.rs#31:describe",
+      "label": "describe()",
+      "source_file": "src/shapes.rs",
+      "start_line": 31
+    },
+    {
       "node_id": "src/shapes.rs#34:impl",
       "label": "impl",
       "source_file": "src/shapes.rs",
@@ -194,6 +200,11 @@
     {
       "source": "src/shapes.rs#22:impl",
       "target": "src/shapes.rs#25:new",
+      "relation": "method"
+    },
+    {
+      "source": "src/shapes.rs#30:Shape",
+      "target": "src/shapes.rs#31:describe",
       "relation": "method"
     },
     {

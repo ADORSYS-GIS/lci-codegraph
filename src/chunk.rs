@@ -38,8 +38,9 @@ pub fn chunk_file(
     if source.len() > MAX_FILE_BYTES {
         return Vec::new();
     }
-    // Detect binary content by scanning the first 512 bytes for null bytes.
-    if source.as_bytes().iter().take(512).any(|&b| b == 0) {
+    // Cheap early-out before we pay for a parse. The authoritative guard lives in `chunk_text`
+    // (and in the walk, before the graph sees the bytes) so it cannot be bypassed — see `is_binary`.
+    if is_binary(source) {
         return Vec::new();
     }
 
@@ -84,7 +85,25 @@ pub fn chunk_tree(
 /// Chunk free text (e.g. PDF-extracted text) through the windowed path text files already take.
 #[must_use]
 pub fn chunk_text(file_path: &str, text: &str, language: &str, tuning: IndexTuning) -> Vec<Chunk> {
+    // The guard belongs HERE, at the point a chunk is produced — not only at `chunk_file`'s door.
+    // `chunk_file` used to be the sole holder of the binary check, and the graph-enabled walk path
+    // never calls it (it parses the tree itself and falls back straight to windowing), so raw NUL
+    // bytes reached `Chunk::content` on the one path production actually runs.
+    if is_binary(text) {
+        return Vec::new();
+    }
     window_chunks(file_path, text, language, tuning)
+}
+
+/// Binary-content sniff: a NUL byte within the first 512 bytes.
+///
+/// NUL is a perfectly legal Unicode scalar, so a blob can be valid UTF-8 — passing every
+/// `read_to_string` check — and still be binary. It has to be caught by content, not by encoding.
+/// This matters downstream and not just aesthetically: PostgreSQL's `text` type rejects the NUL
+/// codepoint outright, so a contaminated chunk fails at persist time, far from its cause.
+#[must_use]
+pub(crate) fn is_binary(source: &str) -> bool {
+    source.as_bytes().iter().take(512).any(|&b| b == 0)
 }
 
 /// Recursively collect interesting nodes. We walk the full tree (not just top-level children) so that
@@ -154,6 +173,14 @@ pub(crate) fn interesting_node(
     let (kind, name_field) = match node.kind() {
         // Rust
         "function_item" => ("function", Some("name")),
+        // A trait method declared WITHOUT a default body (`fn greet(&self);`) parses as
+        // `function_signature_item`, not `function_item`. Omitting it made trait interfaces —
+        // arguably the most important symbols in a Rust codebase — invisible to both the chunker
+        // and the graph. Same `kind` as a bodied function on purpose: it is the same thing to a
+        // reader searching for it, and a new `chunk_type` value would leak into every consumer's
+        // stored data. The graph draws the one distinction that matters (it is not a call target)
+        // from the tree-sitter node kind instead — see `Classifier::is_call_target`.
+        "function_signature_item" => ("function", Some("name")),
         "impl_item" => ("impl", None),
         "struct_item" => ("struct", Some("name")),
         "enum_item" => ("enum", Some("name")),
@@ -305,5 +332,42 @@ mod tests {
             "must still fall back to windowed chunks"
         );
         assert!(chunks.iter().all(|c| c.chunk_type == "window"));
+    }
+
+    #[test]
+    fn signature_only_trait_method_is_chunked_like_a_bodied_one() {
+        // REGRESSION: `fn greet(&self);` parses as `function_signature_item`, which was classified
+        // as nothing — so a trait interface produced no chunk and was invisible to semantic search.
+        let src = "pub trait Greeter {\n    fn greet(&self) -> String;\n    fn shout(&self) -> String { String::new() }\n}\n";
+        let chunks = chunk_file("g.rs", src, "rust", IndexTuning::default());
+        let names: Vec<&str> = chunks
+            .iter()
+            .filter_map(|c| c.symbol_name.as_deref())
+            .collect();
+        assert!(
+            names.contains(&"greet"),
+            "the bodiless declaration must be chunked; got {names:?}"
+        );
+        assert!(
+            names.contains(&"shout"),
+            "the default-bodied method must still be chunked; got {names:?}"
+        );
+        // Same chunk_type as a bodied function on purpose — a new value would leak into every
+        // consumer's stored data for no reader-visible benefit.
+        let greet = chunks
+            .iter()
+            .find(|c| c.symbol_name.as_deref() == Some("greet"))
+            .unwrap();
+        assert_eq!(greet.chunk_type, "function");
+    }
+
+    #[test]
+    fn is_binary_detects_a_nul_only_within_the_sniff_window() {
+        assert!(is_binary("a\0b"));
+        assert!(!is_binary("plain text"));
+        // NUL beyond the 512-byte sniff window is deliberately not detected — the guard is a cheap
+        // prefix sniff, not a full scan. Documented so the bound is a decision, not an accident.
+        let late = format!("{}\0", "x".repeat(512));
+        assert!(!is_binary(&late));
     }
 }
