@@ -223,11 +223,36 @@ impl Classifier<'_> {
         match self {
             // The one Rust node kind that is callable-shaped but bodiless.
             Classifier::Rust => node.kind() != "function_signature_item",
-            // Tags-driven languages capture definitions, and an abstract/interface method that the
-            // grammar's `tags.scm` reports is still reported as a definition; leave them as targets
-            // rather than guess per-grammar. Revisit if a language shows the same duplicate-name
-            // regression Rust would have had.
-            Classifier::Tagged(_) => true,
+            // A captured definition of one of these node KINDS with no `body` child is a
+            // declaration, not an implementation — a call dispatches to an implementation, never to
+            // the declaration itself (issue #5, the tags-path twin of the Rust case above). Verified
+            // directly against each grammar's `node-types.json`:
+            //   - Java `method_declaration`: `body` is an OPTIONAL field, present only when the
+            //     method has one — an interface/`abstract` method has none.
+            //   - TypeScript `method_signature` / `abstract_method_signature` (interface and
+            //     abstract-class members) / `function_signature` (ambient/overload declarations):
+            //     these node kinds have no `body` field at all — they are inherently bodiless.
+            //
+            // The check is scoped to these specific node kinds rather than applied to every `Tagged`
+            // definition unconditionally, because `child_by_field_name("body")` can't distinguish "no
+            // body field on this node kind at all" from "the field exists and is absent" — and several
+            // JS `tags.scm` patterns anchor `@definition.function` on a WRAPPER node with no `body`
+            // field concept of its own (`variable_declarator` for `const f = () => {}`,
+            // `assignment_expression` for `x.f = function(){}`, `pair` for `{ f() {} }`-style object
+            // methods) even though the function VALUE they wrap always has one. Treating those as
+            // bodiless would have wrongly dropped every const-arrow-function call target — caught by
+            // the `javascript-repo` golden gaining a spurious drop before this list was narrowed.
+            // Every other tagged definition shape (JS/TS bodied methods/functions via any capture
+            // pattern, and Python's always-bodied `function_definition` — deliberately unaffected,
+            // since even a `pass`/`...`-bodied abstract method has a body child) has no
+            // bodiless-declaration concept: leave it as a target, matching the pre-fix behaviour.
+            Classifier::Tagged(_) => match node.kind() {
+                "method_declaration"
+                | "method_signature"
+                | "abstract_method_signature"
+                | "function_signature" => node.child_by_field_name("body").is_some(),
+                _ => true,
+            },
         }
     }
 
@@ -454,6 +479,113 @@ mod tests {
             "class → m must be a `method` edge; got {:?}",
             facts.contains
         );
+    }
+
+    #[test]
+    fn tagged_bodiless_interface_method_is_a_node_with_a_method_edge() {
+        // REGRESSION (issue #5, the tags-path twin of the Rust
+        // `signature_only_trait_method_is_a_node_with_a_method_edge` case above): a Java interface
+        // method (`method_declaration` with no `body` field) used to be treated as a call target
+        // regardless — it must still be a definition (a node + `method` edge), just not a call
+        // target (see the next test).
+        let src = "interface Greeter {\n    String greet();\n}\n";
+        let facts = facts_for("java", "Greeter.java", src);
+        let iface = facts.nodes.iter().find(|n| n.label == "Greeter").unwrap();
+        let greet = facts
+            .nodes
+            .iter()
+            .find(|n| n.label == "greet()")
+            .expect("bodiless interface method must produce a node");
+        assert_eq!(greet.start_line, 2);
+        assert!(
+            facts.contains.iter().any(|e| e.relation == "method"
+                && e.source == iface.node_id
+                && e.target == greet.node_id),
+            "Greeter → greet must be a `method` edge; got {:?}",
+            facts.contains
+        );
+    }
+
+    #[test]
+    fn tagged_bodiless_interface_method_is_not_a_call_target() {
+        // It is callable-SHAPED (the node + `method` edge above) but must not enter the resolver's
+        // candidate set: a call dispatches to an implementation, never to the declaration. See
+        // `Classifier::is_call_target`.
+        let src = "interface Greeter {\n    String greet();\n}\n";
+        let facts = facts_for("java", "Greeter.java", src);
+        assert!(
+            facts.callables.is_empty(),
+            "a bodiless interface method must not be a call target; got {:?}",
+            facts.callables
+        );
+    }
+
+    #[test]
+    fn tagged_bodied_method_next_to_its_interface_declaration_is_still_the_only_call_target() {
+        // The tags-path twin of the Rust
+        // `a_bodied_method_next_to_its_declaration_is_still_the_only_call_target` case above: a
+        // single implementation must remain the ONLY call target even though its declaration is
+        // also indexed as a node — otherwise a single-impl interface would go from one candidate to
+        // two the moment declarations were indexed, and the precision-favouring resolver would drop
+        // every call to it (issue #5).
+        let src = "\
+interface Greeter {
+    String greet();
+}
+
+class EnglishGreeter implements Greeter {
+    public String greet() { return \"hello\"; }
+}
+";
+        let facts = facts_for("java", "Greeter.java", src);
+        assert_eq!(
+            facts.callables.len(),
+            1,
+            "exactly one call target (the impl) must survive; got {:?}",
+            facts.callables
+        );
+        let surviving_line = facts
+            .nodes
+            .iter()
+            .find(|n| n.node_id == facts.callables[0].node_id)
+            .expect("callable node id must match an emitted node")
+            .start_line;
+        let impl_method_line = facts
+            .nodes
+            .iter()
+            .filter(|n| n.label == "greet()")
+            .map(|n| n.start_line)
+            .max()
+            .expect("both declaration and impl must be nodes");
+        assert_eq!(
+            surviving_line, impl_method_line,
+            "the surviving call target must be the later-declared impl, not the interface \
+             declaration; got {:?}",
+            facts.callables
+        );
+        // Both defs still exist as nodes — the declaration is indexed, just not dispatched to.
+        assert_eq!(
+            facts.nodes.iter().filter(|n| n.label == "greet()").count(),
+            2,
+            "declaration and implementation must BOTH be nodes; got {:?}",
+            facts.nodes
+        );
+    }
+
+    #[test]
+    fn tagged_bodied_method_is_still_a_call_target() {
+        // Sanity check paired with the bodiless tests above: a normal, bodied Java method (`{ ... }`)
+        // must remain a call target exactly as before this fix — the `body`-field check must not
+        // exclude ordinary definitions.
+        let src = "class C {\n    void m() {}\n}\n";
+        let facts = facts_for("java", "C.java", src);
+        assert_eq!(
+            facts.callables.len(),
+            1,
+            "a bodied method must still be a call target; got {:?}",
+            facts.callables
+        );
+        assert_eq!(facts.callables[0].name, "m");
     }
 
     #[test]

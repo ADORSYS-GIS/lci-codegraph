@@ -228,6 +228,116 @@ fn java_repo_run_bare_ambiguous_build_is_dropped() {
     );
 }
 
+// ── TypeScript: single-impl interface method (issue #5, the tags-path twin of #1) ────────────────
+
+#[test]
+fn typescript_interface_repo_graph_matches_committed_golden() {
+    let g = assert_matches_golden("typescript-interface-repo");
+    assert!(has_cross_file_call(&g), "edges = {:?}", g.edges);
+    assert!(has_method_nesting(&g), "edges = {:?}", g.edges);
+}
+
+#[test]
+fn typescript_interface_repo_declaration_and_impl_are_both_nodes_but_only_one_is_a_call_target() {
+    let g = assert_matches_golden("typescript-interface-repo");
+    let greets: Vec<_> = g.nodes.iter().filter(|n| n.label == "greet()").collect();
+    assert_eq!(
+        greets.len(),
+        2,
+        "the interface declaration and the implementation must both be nodes; got {greets:?}"
+    );
+    let run = g
+        .nodes
+        .iter()
+        .find(|n| n.label == "run()")
+        .expect("run node");
+    let run_bare = g
+        .nodes
+        .iter()
+        .find(|n| n.label == "runBare()")
+        .expect("runBare node");
+    for caller in [run, run_bare] {
+        let targets: Vec<_> = g
+            .edges
+            .iter()
+            .filter(|e| e.relation == "calls" && e.source == caller.node_id)
+            .collect();
+        assert_eq!(
+            targets.len(),
+            1,
+            "{} must resolve to exactly one target; got {targets:?}",
+            caller.label
+        );
+        let dst = g
+            .nodes
+            .iter()
+            .find(|n| n.node_id == targets[0].target)
+            .expect("call target must be an emitted node");
+        assert_eq!(
+            dst.source_file, "src/english-greeter.ts",
+            "{} must resolve to the implementation, not the interface declaration; edges = {:?}",
+            caller.label, g.edges
+        );
+    }
+}
+
+// ── Java: single-impl interface method (issue #5, the tags-path twin of #1) ──────────────────────
+
+#[test]
+fn java_interface_repo_graph_matches_committed_golden() {
+    let g = assert_matches_golden("java-interface-repo");
+    assert!(has_cross_file_call(&g), "edges = {:?}", g.edges);
+    assert!(has_method_nesting(&g), "edges = {:?}", g.edges);
+}
+
+#[test]
+fn java_interface_repo_declaration_and_impl_are_both_nodes_but_only_one_is_a_call_target() {
+    // The actual bug (issue #5): a Java interface method with a single implementation used to
+    // produce no `calls` edge at all — the declaration and the implementation both registered as
+    // call targets under the bare name `greet`, so the resolver saw two candidates with no
+    // disambiguating qualifier and dropped the call as ambiguous.
+    let g = assert_matches_golden("java-interface-repo");
+    let greets: Vec<_> = g.nodes.iter().filter(|n| n.label == "greet()").collect();
+    assert_eq!(
+        greets.len(),
+        2,
+        "the interface declaration and the implementation must both be nodes; got {greets:?}"
+    );
+    let run = g
+        .nodes
+        .iter()
+        .find(|n| n.label == "run()")
+        .expect("run node");
+    let run_bare = g
+        .nodes
+        .iter()
+        .find(|n| n.label == "runBare()")
+        .expect("runBare node");
+    for caller in [run, run_bare] {
+        let targets: Vec<_> = g
+            .edges
+            .iter()
+            .filter(|e| e.relation == "calls" && e.source == caller.node_id)
+            .collect();
+        assert_eq!(
+            targets.len(),
+            1,
+            "{} must resolve to exactly one target; got {targets:?}",
+            caller.label
+        );
+        let dst = g
+            .nodes
+            .iter()
+            .find(|n| n.node_id == targets[0].target)
+            .expect("call target must be an emitted node");
+        assert_eq!(
+            dst.source_file, "EnglishGreeter.java",
+            "{} must resolve to the implementation, not the interface declaration; edges = {:?}",
+            caller.label, g.edges
+        );
+    }
+}
+
 // ── Polyglot (Python + TypeScript + Rust + Java in one checkout) ──────────────────────────────────
 
 #[test]
@@ -273,6 +383,8 @@ fn fixtures_have_no_embedded_git_dir() {
         "javascript-repo",
         "tsx-repo",
         "java-repo",
+        "typescript-interface-repo",
+        "java-interface-repo",
         "polyglot-repo",
     ] {
         let root = fixture_root(name);

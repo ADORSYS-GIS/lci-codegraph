@@ -1,0 +1,100 @@
+{
+  "nodes": [
+    {
+      "node_id": "src/english-greeter.ts",
+      "label": "english-greeter.ts",
+      "source_file": "src/english-greeter.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/english-greeter.ts#1:EnglishGreeter",
+      "label": "EnglishGreeter",
+      "source_file": "src/english-greeter.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/english-greeter.ts#2:greet",
+      "label": "greet()",
+      "source_file": "src/english-greeter.ts",
+      "start_line": 2
+    },
+    {
+      "node_id": "src/greeter.ts",
+      "label": "greeter.ts",
+      "source_file": "src/greeter.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/greeter.ts#1:Greeter",
+      "label": "Greeter",
+      "source_file": "src/greeter.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/greeter.ts#2:greet",
+      "label": "greet()",
+      "source_file": "src/greeter.ts",
+      "start_line": 2
+    },
+    {
+      "node_id": "src/main.ts",
+      "label": "main.ts",
+      "source_file": "src/main.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main.ts#12:runBare",
+      "label": "runBare()",
+      "source_file": "src/main.ts",
+      "start_line": 12
+    },
+    {
+      "node_id": "src/main.ts#4:run",
+      "label": "run()",
+      "source_file": "src/main.ts",
+      "start_line": 4
+    }
+  ],
+  "edges": [
+    {
+      "source": "src/english-greeter.ts",
+      "target": "src/english-greeter.ts#1:EnglishGreeter",
+      "relation": "contains"
+    },
+    {
+      "source": "src/english-greeter.ts#1:EnglishGreeter",
+      "target": "src/english-greeter.ts#2:greet",
+      "relation": "method"
+    },
+    {
+      "source": "src/greeter.ts",
+      "target": "src/greeter.ts#1:Greeter",
+      "relation": "contains"
+    },
+    {
+      "source": "src/greeter.ts#1:Greeter",
+      "target": "src/greeter.ts#2:greet",
+      "relation": "method"
+    },
+    {
+      "source": "src/main.ts",
+      "target": "src/main.ts#12:runBare",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.ts",
+      "target": "src/main.ts#4:run",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.ts#12:runBare",
+      "target": "src/english-greeter.ts#2:greet",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main.ts#4:run",
+      "target": "src/english-greeter.ts#2:greet",
+      "relation": "calls"
+    }
+  ]
+}

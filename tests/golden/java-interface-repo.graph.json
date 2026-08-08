@@ -1,0 +1,111 @@
+{
+  "nodes": [
+    {
+      "node_id": "EnglishGreeter.java",
+      "label": "EnglishGreeter.java",
+      "source_file": "EnglishGreeter.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "EnglishGreeter.java#1:EnglishGreeter",
+      "label": "EnglishGreeter",
+      "source_file": "EnglishGreeter.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "EnglishGreeter.java#2:greet",
+      "label": "greet()",
+      "source_file": "EnglishGreeter.java",
+      "start_line": 2
+    },
+    {
+      "node_id": "Greeter.java",
+      "label": "Greeter.java",
+      "source_file": "Greeter.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Greeter.java#1:Greeter",
+      "label": "Greeter",
+      "source_file": "Greeter.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Greeter.java#2:greet",
+      "label": "greet()",
+      "source_file": "Greeter.java",
+      "start_line": 2
+    },
+    {
+      "node_id": "Main.java",
+      "label": "Main.java",
+      "source_file": "Main.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Main.java#11:runBare",
+      "label": "runBare()",
+      "source_file": "Main.java",
+      "start_line": 11
+    },
+    {
+      "node_id": "Main.java#1:Main",
+      "label": "Main",
+      "source_file": "Main.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Main.java#3:run",
+      "label": "run()",
+      "source_file": "Main.java",
+      "start_line": 3
+    }
+  ],
+  "edges": [
+    {
+      "source": "EnglishGreeter.java",
+      "target": "EnglishGreeter.java#1:EnglishGreeter",
+      "relation": "contains"
+    },
+    {
+      "source": "EnglishGreeter.java#1:EnglishGreeter",
+      "target": "EnglishGreeter.java#2:greet",
+      "relation": "method"
+    },
+    {
+      "source": "Greeter.java",
+      "target": "Greeter.java#1:Greeter",
+      "relation": "contains"
+    },
+    {
+      "source": "Greeter.java#1:Greeter",
+      "target": "Greeter.java#2:greet",
+      "relation": "method"
+    },
+    {
+      "source": "Main.java",
+      "target": "Main.java#1:Main",
+      "relation": "contains"
+    },
+    {
+      "source": "Main.java#11:runBare",
+      "target": "EnglishGreeter.java#2:greet",
+      "relation": "calls"
+    },
+    {
+      "source": "Main.java#1:Main",
+      "target": "Main.java#11:runBare",
+      "relation": "method"
+    },
+    {
+      "source": "Main.java#1:Main",
+      "target": "Main.java#3:run",
+      "relation": "method"
+    },
+    {
+      "source": "Main.java#3:run",
+      "target": "EnglishGreeter.java#2:greet",
+      "relation": "calls"
+    }
+  ]
+}
