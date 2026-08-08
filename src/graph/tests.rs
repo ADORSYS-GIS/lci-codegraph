@@ -701,3 +701,168 @@ fn a_call_to_a_single_impl_trait_method_still_resolves_to_the_impl() {
         "must resolve to the impl in circle.rs, not the declaration; got {targets:?}"
     );
 }
+
+// ── Tags path: declaration vs. call target (issue #5, the tags-path twin of the Rust case above) ──
+
+#[test]
+fn java_call_to_a_single_impl_interface_method_resolves_to_the_implementation() {
+    // The actual bug (issue #5): before the fix, the interface declaration and its sole
+    // implementation both registered as call targets under the bare name `greet`, so the
+    // precision-favouring resolver saw two same-named candidates with no disambiguating qualifier
+    // and dropped the call as ambiguous. A BARE call is used deliberately (mirroring the Rust
+    // twin's `c.describe()`, which also carries no qualifier): it isolates the exact mechanism this
+    // PR fixes — one candidate instead of two — from the tags path's separate qualifier heuristic
+    // (see `java_call_through_an_interface_typed_variable_needs_a_qualifier_match`, below, for why
+    // the issue's own `g.greet()` receiver-variable phrasing needs a different fixture).
+    let greeter = (
+        "Greeter.java",
+        "interface Greeter {\n    String greet();\n}\n",
+    );
+    let english_greeter = (
+        "EnglishGreeter.java",
+        "class EnglishGreeter implements Greeter {\n    public String greet() { return \"hello\"; }\n}\n",
+    );
+    let main = (
+        "Main.java",
+        "class Main {\n    String run() {\n        return greet();\n    }\n}\n",
+    );
+    let g = graph_of_lang("java", &[greeter, english_greeter, main]);
+
+    // Both the declaration and the implementation are indexed as nodes.
+    let greets: Vec<&GraphNode> = g.nodes.iter().filter(|n| n.label == "greet()").collect();
+    assert_eq!(
+        greets.len(),
+        2,
+        "declaration and implementation must both be indexed as nodes; got {greets:?}"
+    );
+
+    // ...but the call resolves, and resolves to the IMPLEMENTATION, not the declaration.
+    let run = node(&g, "run()");
+    let calls: Vec<_> = g
+        .edges
+        .iter()
+        .filter(|e| e.relation == "calls" && e.source == run.node_id)
+        .collect();
+    assert_eq!(
+        calls.len(),
+        1,
+        "the call must resolve to exactly one target; got {calls:?}"
+    );
+    let target = g
+        .nodes
+        .iter()
+        .find(|n| n.node_id == calls[0].target)
+        .expect("call target must be an emitted node");
+    assert_eq!(
+        target.source_file, "EnglishGreeter.java",
+        "must resolve to the implementation, not the interface declaration; edges = {:?}",
+        g.edges
+    );
+}
+
+#[test]
+fn java_call_through_an_interface_typed_variable_needs_a_qualifier_match() {
+    // FINDING, not fixed here (out of scope — "any change to the resolver's ambiguity policy" is
+    // excluded from issue #5): the issue's own literal reproduction, `g.greet()` where
+    // `g: Greeter`, still does NOT resolve after this fix. `resolve::pick`'s single-candidate
+    // branch rejects a candidate whose scope doesn't textually equal the call's qualifier, and
+    // `qualifier_from_callee_node` sets the qualifier to the raw receiver identifier — here `g`,
+    // the PARAMETER name, not `EnglishGreeter`, the implementing type. There is no type inference in
+    // the tags path, so a receiver variable can never textually match the type that defines the
+    // method it calls. This test documents the boundary of this PR's fix, not a regression: it
+    // passed (found nothing) before this change too, for the SAME underlying reason plus the
+    // declaration-vs-target ambiguity this PR removes — dropping from "ambiguous" to "unresolved"
+    // is not a functional improvement for this exact call shape. Calling through the class name
+    // (`EnglishGreeter.greet()`, next test, and the `java-interface-repo` golden fixture) is the
+    // shape that already works, matching this codebase's existing `Widget.build()`-style qualified
+    // calls in `tests/fixtures/java-repo`.
+    let greeter = (
+        "Greeter.java",
+        "interface Greeter {\n    String greet();\n}\n",
+    );
+    let english_greeter = (
+        "EnglishGreeter.java",
+        "class EnglishGreeter implements Greeter {\n    public String greet() { return \"hello\"; }\n}\n",
+    );
+    let main = (
+        "Main.java",
+        "class Main {\n    void run(Greeter g) {\n        g.greet();\n    }\n}\n",
+    );
+    let g = graph_of_lang("java", &[greeter, english_greeter, main]);
+    assert!(
+        !g.edges.iter().any(|e| e.relation == "calls"),
+        "documents a known, pre-existing, separate limitation — not asserting desired behaviour; \
+         edges = {:?}",
+        g.edges
+    );
+}
+
+#[test]
+fn java_call_to_an_interface_method_with_no_implementation_does_not_resolve() {
+    // The direct converse of the fix: a declaration alone — no implementation anywhere — must never
+    // be treated as a call target. Without the fix this would have been the sole (and therefore
+    // "successfully resolving") candidate, silently dispatching a call to a declaration that has no
+    // body to run.
+    let g = graph_of_lang(
+        "java",
+        &[(
+            "Greeter.java",
+            "interface Greeter {\n    String greet();\n}\nclass Main {\n    String run() {\n        return greet();\n    }\n}\n",
+        )],
+    );
+    assert!(
+        !g.edges.iter().any(|e| e.relation == "calls"),
+        "a call to a declaration-only method must not resolve; edges = {:?}",
+        g.edges
+    );
+}
+
+#[test]
+fn typescript_call_to_a_single_impl_interface_method_resolves_to_the_implementation() {
+    // The TypeScript twin of the Java case above. Verified against `tree-sitter-typescript`'s
+    // `node-types.json`: `method_signature` (interface members) and `abstract_method_signature`
+    // (abstract-class members) have no `body` field at all, while `method_definition` requires one
+    // — the same bodiless-declaration shape as Java, captured by the SAME `is_call_target` check.
+    let greeter = (
+        "greeter.ts",
+        "export interface Greeter {\n  greet(): string;\n}\n",
+    );
+    let english_greeter = (
+        "english-greeter.ts",
+        "export class EnglishGreeter implements Greeter {\n  greet(): string {\n    return 'hello';\n  }\n}\n",
+    );
+    let main = (
+        "main.ts",
+        "function run(): string {\n  return greet();\n}\n",
+    );
+    let g = graph_of_lang("typescript", &[greeter, english_greeter, main]);
+
+    let greets: Vec<&GraphNode> = g.nodes.iter().filter(|n| n.label == "greet()").collect();
+    assert_eq!(
+        greets.len(),
+        2,
+        "declaration and implementation must both be indexed as nodes; got {greets:?}"
+    );
+
+    let run = node(&g, "run()");
+    let calls: Vec<_> = g
+        .edges
+        .iter()
+        .filter(|e| e.relation == "calls" && e.source == run.node_id)
+        .collect();
+    assert_eq!(
+        calls.len(),
+        1,
+        "the call must resolve to exactly one target; got {calls:?}"
+    );
+    let target = g
+        .nodes
+        .iter()
+        .find(|n| n.node_id == calls[0].target)
+        .expect("call target must be an emitted node");
+    assert_eq!(
+        target.source_file, "english-greeter.ts",
+        "must resolve to the implementation, not the interface declaration; edges = {:?}",
+        g.edges
+    );
+}
