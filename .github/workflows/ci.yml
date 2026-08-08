@@ -63,7 +63,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: cargo clippy -D warnings
-        run: cargo clippy --all-targets --all-features --locked -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
   test:
     name: test
@@ -85,10 +85,10 @@ jobs:
       # `container-tests` feature — see tests/container_{neo4j,build,repos}.rs and
       # container-tests.yml), so this needs no Docker daemon.
       - name: cargo test (lib + integration)
-        run: cargo test --locked --all-targets
+        run: cargo test --workspace --locked --all-targets
 
       - name: cargo test --doc
-        run: cargo test --locked --doc
+        run: cargo test --workspace --locked --doc
 
   msrv:
     name: msrv
@@ -177,7 +177,7 @@ jobs:
           workspaces: "."
 
       - name: cargo doc --all-features
-        run: cargo doc --no-deps --all-features
+        run: cargo doc --workspace --no-deps --all-features
 
   deny:
     name: deny
