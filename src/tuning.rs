@@ -60,6 +60,48 @@ fn env_usize(key: &str, default: usize) -> usize {
 mod tests {
     use super::{IndexTuning, env_usize};
 
+    // `cargo test` runs this module's tests as threads within ONE process, and `std::env` is
+    // process-global — so any two tests that set/read the same `INDEX_*` (or shared
+    // `LCI_CODEGRAPH_TEST_ENV_USIZE*`) var concurrently can interleave and observe each other's
+    // values. Every test below that touches process env acquires this for its whole body to
+    // force those tests to run one at a time.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Restores a set of env vars to their original (possibly absent) values on drop, so a
+    /// panicking assertion mid-test still cleans up rather than leaking mutated env into whatever
+    /// test happens to run next in this process. Mirrors `tests/env_config.rs`'s `EnvGuard`.
+    struct EnvGuard {
+        saved: Vec<(&'static str, Option<String>)>,
+    }
+
+    impl EnvGuard {
+        /// Captures the current value of each key (for restoration) without setting anything —
+        /// for tests that only need cleanup, not an initial value.
+        fn capture(keys: &[&'static str]) -> Self {
+            let saved = keys.iter().map(|k| (*k, std::env::var(k).ok())).collect();
+            Self { saved }
+        }
+
+        fn set(vars: &[(&'static str, &str)]) -> Self {
+            let guard = Self::capture(&vars.iter().map(|(k, _)| *k).collect::<Vec<_>>());
+            for (k, v) in vars {
+                unsafe { std::env::set_var(k, v) };
+            }
+            guard
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            for (k, v) in &self.saved {
+                match v {
+                    Some(v) => unsafe { std::env::set_var(k, v) },
+                    None => unsafe { std::env::remove_var(k) },
+                }
+            }
+        }
+    }
+
     #[test]
     fn defaults_match_the_historical_hardcoded_values() {
         let tuning = IndexTuning::default();
@@ -71,8 +113,13 @@ mod tests {
 
     #[test]
     fn env_usize_parses_clamps_to_one_and_falls_back() {
+        // Poisoning here means some other test in this module already panicked and that failure
+        // is already reported elsewhere; propagating the poison would just turn one real failure
+        // into a cascade of spurious ones in every other locked test.
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         // A test-unique key so this never races another test's environment.
         let key = "LCI_CODEGRAPH_TEST_ENV_USIZE";
+        let _env_guard = EnvGuard::capture(&[key]);
         unsafe { std::env::remove_var(key) };
         assert_eq!(env_usize(key, 7), 7, "unset → default");
         unsafe { std::env::set_var(key, "12") };
@@ -81,47 +128,46 @@ mod tests {
         assert_eq!(env_usize(key, 7), 1, "zero clamps to 1");
         unsafe { std::env::set_var(key, "not-a-number") };
         assert_eq!(env_usize(key, 7), 7, "unparseable → default");
-        unsafe { std::env::remove_var(key) };
     }
 
     #[test]
     fn env_usize_overflowing_value_falls_back_to_default() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         // A numeral too large for `usize` fails to parse the same way non-numeric text does.
         let key = "LCI_CODEGRAPH_TEST_ENV_USIZE_OVERFLOW";
+        let _env_guard = EnvGuard::capture(&[key]);
         unsafe { std::env::set_var(key, "999999999999999999999999999999999999") };
         assert_eq!(env_usize(key, 9), 9, "overflow parse failure → default");
-        unsafe { std::env::remove_var(key) };
     }
 
     #[test]
     fn from_env_reads_all_four_knobs() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let vars = [
             ("INDEX_EMBED_BATCH_SIZE", "16"),
             ("INDEX_MAX_CHUNK_LINES", "75"),
             ("INDEX_WINDOW_SIZE", "40"),
             ("INDEX_WINDOW_STEP", "20"),
         ];
-        for (k, v) in vars {
-            unsafe { std::env::set_var(k, v) };
-        }
+        let _env_guard = EnvGuard::set(&vars);
         let tuning = IndexTuning::from_env();
         assert_eq!(tuning.embed_batch_size, 16);
         assert_eq!(tuning.max_chunk_lines, 75);
         assert_eq!(tuning.window_size, 40);
         assert_eq!(tuning.window_step, 20);
-        for (k, _) in vars {
-            unsafe { std::env::remove_var(k) };
-        }
     }
 
     #[test]
     fn from_env_falls_back_to_defaults_when_unset() {
-        for k in [
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let keys = [
             "INDEX_EMBED_BATCH_SIZE",
             "INDEX_MAX_CHUNK_LINES",
             "INDEX_WINDOW_SIZE",
             "INDEX_WINDOW_STEP",
-        ] {
+        ];
+        let _env_guard = EnvGuard::capture(&keys);
+        for k in keys {
             unsafe { std::env::remove_var(k) };
         }
         let from_env = IndexTuning::from_env();
