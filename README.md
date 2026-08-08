@@ -56,6 +56,81 @@ Both come out of the **same walk** — the tree is parsed once per file and fed 
 graph builder together (`build_graph: false`, the default, skips graph extraction and returns an
 empty `Graph`, so a caller that only wants chunks pays nothing extra).
 
+## Raw inputs: the filesystem is one reader
+
+The crate indexes **bytes, not files**. A [`RawInput`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.RawInput.html)
+is just a logical path plus content; nothing below it cares where those bytes came from. `walk_checkout`
+above is a convenience built on a filesystem *reader* (`FsSource`), but it is one reader among several
+possible ones — a host that already has content in memory (a git object store, a tarball stream, an
+HTTP fetch, open editor buffers, rows pulled from a database) never has to materialise a checkout on
+disk just to use this crate. It can build `RawInput`s directly and hand them to the indexing core in
+[`input`](https://docs.rs/lci-codegraph/latest/lci_codegraph/input/index.html).
+
+For a caller that has every input up front, [`index_inputs`](https://docs.rs/lci-codegraph/latest/lci_codegraph/fn.index_inputs.html)
+takes an iterator of `RawInput` and an [`IndexOptions`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.IndexOptions.html):
+
+```rust
+use lci_codegraph::{IndexOptions, RawInput, index_inputs};
+
+fn main() {
+    let inputs = vec![
+        RawInput::text("src/main.rs", "fn main() { helper(); }\n"),
+        RawInput::text("src/helper.rs", "pub fn helper() {}\n"),
+        // No filename extension to detect from — a DB row, a gist, a paste — so say the language
+        // explicitly instead.
+        RawInput::text("gist:a1b2c3", "def greet():\n    pass\n").with_language("python"),
+    ];
+
+    let options = IndexOptions::builder().build_graph(true).build();
+    let output = index_inputs(inputs, &options);
+
+    for chunk in &output.chunks {
+        println!("{} [{}]", chunk.file_path, chunk.chunk_type);
+    }
+    // main() --calls--> helper(), resolved across the two files above.
+    for edge in &output.graph.edges {
+        println!("{} --{}--> {}", edge.source, edge.relation, edge.target);
+    }
+}
+```
+
+For a caller that does **not** have every input up front — reading tarball entries one at a time,
+say — drive the streaming [`Indexer`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.Indexer.html)
+directly instead: `push` each input as it arrives, then `finish` once:
+
+```rust
+use lci_codegraph::{IndexOptions, Indexer, RawInput};
+
+fn index_streaming(sources: impl Iterator<Item = (String, Vec<u8>)>) -> lci_codegraph::IndexOutput {
+    let options = IndexOptions::builder().build_graph(true).build();
+    let mut indexer = Indexer::new(options);
+    for (path, bytes) in sources {
+        indexer.push(RawInput::new(path, bytes));
+    }
+    indexer.finish()
+}
+```
+
+`FsSource` itself is public and directly usable as an `Iterator<Item = RawInput>`, not just through
+`walk_checkout` — so a caller can mix filesystem inputs with in-memory ones in a single `Indexer`:
+
+```rust,ignore
+let mut indexer = Indexer::new(IndexOptions::from(&walk_options));
+for input in FsSource::new(root, &walk_options)? {
+    indexer.push(input);
+}
+indexer.push(RawInput::text("scratch/notes.md", "# TODO\n"));
+let output = indexer.finish();
+```
+
+What the indexer does and does not do: `Indexer::push` applies the byte cap (`MAX_INPUT_BYTES` at the
+reader level, then the tighter per-kind cap once it knows source vs PDF), the UTF-8/binary content
+sniff, language detection (`RawInput::language`, falling back to `lang::from_path`), and the PDF size
+bound. It does **not** filter paths — deciding which inputs are even worth handing over is the
+*reader's* job, because only the reader can avoid paying to produce an input that will just be
+discarded. `FsSource` is where that filtering happens for a filesystem checkout, composing the repo's
+own `.gitignore` with the operator glob layer (see "The ignore model" below).
+
 ## The output model
 
 ### Chunks
@@ -129,7 +204,7 @@ graph LR
 
 ```mermaid
 flowchart LR
-    A[walk checkout] --> B["parse<br/>(one tree-sitter pass per file)"]
+    A["reader (e.g. FsSource)<br/>produces RawInput"] --> B["Indexer::push:<br/>parse (one tree-sitter pass per input)"]
     B --> C["chunk: tree-sitter items,<br/>windowed fallback"]
     B --> D["extract_file:<br/>per-file defs + call sites"]
     D --> E["resolve:<br/>cross-file name resolution"]
@@ -162,15 +237,26 @@ to the registry; see `docs/architecture.md`.
 
 ## Configuration
 
-`WalkOptions` ([`bon`](https://docs.rs/bon) builder):
+`WalkOptions` ([`bon`](https://docs.rs/bon) builder) configures the filesystem reader (`FsSource` /
+`walk_checkout`). Three of its five fields are **content-level** — they simply pass through to
+[`IndexOptions`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.IndexOptions.html) via
+`impl From<&WalkOptions> for IndexOptions`, so a non-filesystem reader configures the identical
+behaviour by building `IndexOptions` directly. The other two are **FS-reader-only**: they decide which
+paths `FsSource` hands over in the first place and have no `IndexOptions` equivalent at all — a reader
+with no filesystem to walk has nothing to plug them into.
 
-| Field | Default | Meaning |
-|---|---|---|
-| `tuning` | `IndexTuning::default()` | Chunking/window sizing (below) |
-| `respect_gitignore` | `true` | Honour the repo's own `.gitignore` (and nested/parent ignore files) |
-| `build_graph` | `false` | Build the structural graph. Off by default: a caller that only wants chunks pays no graph-extraction cost |
-| `extract_pdfs` | `true` | Extract text from PDFs and chunk it |
-| `extra_ignore_globs` | `[]` | Operator-supplied gitignore-syntax globs, layered on top of the built-in defaults |
+| Field | Default | Level | Meaning |
+|---|---|---|---|
+| `tuning` | `IndexTuning::default()` | content (`IndexOptions::tuning`) | Chunking/window sizing (below) |
+| `build_graph` | `false` | content (`IndexOptions::build_graph`) | Build the structural graph. Off by default: a caller that only wants chunks pays no graph-extraction cost |
+| `extract_pdfs` | `true` | content (`IndexOptions::extract_pdfs`) | Extract text from PDFs and chunk it |
+| `respect_gitignore` | `true` | **FS-reader-only** | Honour the repo's own `.gitignore` (and nested/parent ignore files) |
+| `extra_ignore_globs` | `[]` | **FS-reader-only** | Operator-supplied gitignore-syntax globs, layered on top of the built-in defaults |
+
+A caller driving the raw-inputs core directly (`index_inputs`/`Indexer`) builds
+[`IndexOptions`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.IndexOptions.html) instead —
+the same `tuning`/`build_graph`/`extract_pdfs` three fields, with the same defaults, and no ignore
+fields at all (path filtering isn't its job; see "Raw inputs: the filesystem is one reader" above).
 
 `IndexTuning` fields, each readable from an environment variable via
 [`IndexTuning::from_env`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.IndexTuning.html)
@@ -203,6 +289,30 @@ directly with `include_defaults(false)`:
 ```
 target/  node_modules/  .git/  dist/  build/  vendor/  .venv/  venv/  .next/  __pycache__/
 ```
+
+## Stats
+
+Every run — `walk_checkout`, `index_inputs`, or a manual `Indexer` — returns
+[`IndexStats`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.IndexStats.html) on
+`output.stats`, and logs the same counters at `info` on `finish`. They exist because, with raw inputs,
+"nothing got indexed" can mean several different things from the outside, and the counters tell them
+apart:
+
+| Field | Meaning |
+|---|---|
+| `files_chunked` | Inputs that produced at least one chunk |
+| `paths_ignored` | Inputs a reader pruned before they ever reached `Indexer::push` (e.g. `FsSource` skipping a `.gitignore`d or operator-ignored path) |
+| `pdfs_extracted` | PDFs successfully text-extracted |
+| `pdfs_skipped` | PDFs over the byte cap or that failed extraction |
+| `files_skipped_binary` | Content rejected as binary: either it fails UTF-8 decoding outright, or it decodes fine but trips the content sniff (a NUL byte in the first 512 bytes) |
+| `files_skipped_too_large` *(new)* | Inputs over `chunk::MAX_FILE_BYTES`, rejected before any parse/decode work |
+| `files_skipped_unsupported` *(new)* | Inputs with no determinable language: `RawInput::language` was `None` and `lang::from_path` couldn't classify the path either (and it wasn't a PDF) |
+
+`files_skipped_too_large` and `files_skipped_unsupported` are new with the raw-inputs core: a raw
+input often has no meaningful filename or a size nobody validated up front — a DB row, a gist, an
+editor buffer — so both failure modes needed their own counter instead of silently landing in
+`files_skipped_binary` or vanishing. `files_skipped_binary` itself now also covers UTF-8 decode
+failures; previously that path incremented nothing at all.
 
 ## PDF handling
 

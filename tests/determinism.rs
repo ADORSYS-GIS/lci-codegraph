@@ -6,7 +6,9 @@
 
 mod common;
 
-use lci_codegraph::{WalkOptions, walk_checkout};
+use std::path::{Path, PathBuf};
+
+use lci_codegraph::{IndexOptions, RawInput, WalkOptions, index_inputs, walk_checkout};
 
 #[test]
 fn same_checkout_walked_twice_is_byte_identical() {
@@ -101,4 +103,138 @@ fn determinism_holds_across_all_committed_language_goldens() {
         let g2 = walk_checkout(&root, &options).unwrap().graph;
         assert_eq!(g1, g2, "{fixture} must walk deterministically");
     }
+}
+
+// ── Raw-input order-independence ────────────────────────────────────────────────────────────────
+// The three tests above prove `walk_checkout` doesn't depend on filesystem iteration order — but
+// that's an indirect proof, since a test can't fully control what order a real directory walk
+// visits entries in. With raw inputs the caller supplies the order directly, so these are more
+// direct versions of the same guarantee: `graph::resolve`'s local-first policy and its sort+dedup
+// must not depend on which `RawInput` reached `Indexer::push` first.
+
+fn fixture_root(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures")
+        .join(name)
+}
+
+/// Read `root/rel` into a `RawInput` carrying the same `/`-separated logical path `FsSource` itself
+/// would produce. Duplicated from `tests/raw_inputs.rs`'s own `raw_input_for` rather than shared,
+/// since integration-test binaries can't reach into each other's modules — only into `tests/common`.
+fn read_raw_input(root: &Path, rel: &str) -> RawInput<'static> {
+    let bytes = std::fs::read(root.join(rel)).unwrap_or_else(|e| panic!("read {rel}: {e}"));
+    RawInput::new(rel.to_string(), bytes)
+}
+
+#[test]
+fn raw_inputs_pushed_in_a_different_order_produce_an_identical_graph() {
+    let root = fixture_root("polyglot-repo");
+    let forward = [
+        "java/App.java",
+        "python/main.py",
+        "python/models.py",
+        "python/util.py",
+        "rust/lib.rs",
+        "ts/main.ts",
+        "ts/service.ts",
+    ];
+    // A genuine shuffle, not a plain reversal (that's covered separately below) — interleaves
+    // languages instead of visiting each one's files contiguously.
+    let shuffled = [
+        "rust/lib.rs",
+        "ts/service.ts",
+        "python/util.py",
+        "java/App.java",
+        "ts/main.ts",
+        "python/models.py",
+        "python/main.py",
+    ];
+
+    let options = IndexOptions::builder().build_graph(true).build();
+    let g1 = index_inputs(
+        forward.iter().map(|rel| read_raw_input(&root, rel)),
+        &options,
+    )
+    .graph;
+    let g2 = index_inputs(
+        shuffled.iter().map(|rel| read_raw_input(&root, rel)),
+        &options,
+    )
+    .graph;
+
+    assert_eq!(
+        g1.nodes, g2.nodes,
+        "node identity/order must not depend on push order"
+    );
+    assert_eq!(
+        g1.edges, g2.edges,
+        "edge identity/order must not depend on push order"
+    );
+}
+
+#[test]
+fn running_index_inputs_twice_over_the_same_inputs_is_byte_identical() {
+    let root = fixture_root("polyglot-repo");
+    let files = [
+        "java/App.java",
+        "python/main.py",
+        "python/models.py",
+        "python/util.py",
+        "rust/lib.rs",
+        "ts/main.ts",
+        "ts/service.ts",
+    ];
+    let options = IndexOptions::builder().build_graph(true).build();
+    let build = || index_inputs(files.iter().map(|rel| read_raw_input(&root, rel)), &options);
+
+    let out1 = build();
+    let out2 = build();
+
+    let json1 = serde_json::to_string_pretty(&out1.graph).unwrap();
+    let json2 = serde_json::to_string_pretty(&out2.graph).unwrap();
+    assert_eq!(json1, json2, "serialised graph must be byte-identical");
+    assert_eq!(
+        out1.chunks, out2.chunks,
+        "chunks must be identically ordered across repeat runs over the same inputs"
+    );
+}
+
+#[test]
+fn a_reversed_input_order_still_resolves_the_same_cross_file_calls_edges() {
+    let root = fixture_root("polyglot-repo");
+    let forward = [
+        "java/App.java",
+        "python/main.py",
+        "python/models.py",
+        "python/util.py",
+        "rust/lib.rs",
+        "ts/main.ts",
+        "ts/service.ts",
+    ];
+
+    let options = IndexOptions::builder().build_graph(true).build();
+    let forward_out = index_inputs(
+        forward.iter().map(|rel| read_raw_input(&root, rel)),
+        &options,
+    );
+    let reversed_out = index_inputs(
+        forward.iter().rev().map(|rel| read_raw_input(&root, rel)),
+        &options,
+    );
+
+    let calls = |g: &lci_codegraph::Graph| -> Vec<lci_codegraph::GraphEdge> {
+        g.edges
+            .iter()
+            .filter(|e| e.relation == "calls")
+            .cloned()
+            .collect()
+    };
+    assert_eq!(
+        calls(&forward_out.graph),
+        calls(&reversed_out.graph),
+        "the exact set of resolved calls edges must not depend on input order"
+    );
+    // The graphs as a whole must also match — `resolve`'s sort+dedup canonicalises everything, not
+    // just the calls edges singled out above.
+    assert_eq!(forward_out.graph, reversed_out.graph);
 }

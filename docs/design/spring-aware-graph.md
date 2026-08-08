@@ -189,8 +189,8 @@ the pipeline, not inside per-file `extract_file`:
 
 ```mermaid
 flowchart TD
-    A["walk_checkout(root, options)"] --> B["per file: extract_file(tree, ...)<br/>→ FileSymbols (unchanged)"]
-    A --> C["per file: spring::extract_facts(tree, ...)<br/>→ FileSpringFacts (NEW, sibling pass, same tree)"]
+    A["Indexer::push(input)<br/>(input from FsSource via walk_checkout, or any other reader)"] --> B["per input: extract_file(tree, ...)<br/>→ FileSymbols (unchanged)"]
+    A --> C["per input: spring::extract_facts(tree, ...)<br/>→ FileSpringFacts (NEW, sibling pass, same tree)"]
     B --> D["Vec&lt;FileSymbols&gt;"]
     C --> E["Vec&lt;FileSpringFacts&gt;"]
     D --> F["graph::resolve(files, spring_facts: Option&lt;&amp;[FileSpringFacts]&gt;)"]

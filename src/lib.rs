@@ -5,23 +5,28 @@
 //! `index` mode consumes — the sole structural-graph engine, having retired the Python **Graphify**
 //! CLI dependency (ADR-0019).
 //!
-//! This crate is a pure extractor: it parses a checkout and returns [`Chunk`]s and a [`Graph`] of
-//! payload-compatible nodes/edges. The **host** maps those onto the internal-API payloads
+//! This crate is a pure extractor: it indexes raw `(path, bytes)` inputs and returns [`Chunk`]s and a
+//! [`Graph`] of payload-compatible nodes/edges — a filesystem checkout is one *source* of such inputs,
+//! not the only one. The **host** maps the output onto the internal-API payloads
 //! (`agent-clients::ChunkPayload` / `GraphNodePayload` / `GraphEdgePayload`) and submits them, exactly
 //! as `index_checkout` does today — the crate holds no `kube`/`sqlx`/forge dependencies (ADR-0083).
 //!
 //! ## What this crate delivers
+//! - [`input`] — the source-agnostic indexing core: [`Indexer`] over raw `(path, bytes)`
+//!   [`RawInput`]s, of which a filesystem checkout is one source.
 //! - [`ignore_list`] — gitignore-style, operator-configurable ignore layer that **composes with** the
 //!   repo `.gitignore`, replacing the old hardcoded dir set.
 //! - [`pdf`] — bounded PDF text extraction (byte-capped before parse, panic-caught).
 //! - [`graph`] — the structural call/reference graph with **cross-file resolution** for Rust, Python,
 //!   TypeScript/JavaScript (incl. TSX/JSX), and Java.
-//! - [`walk`] — the one-pass walk producing chunks + graph, honouring both ignore layers.
+//! - [`walk`] — the filesystem reader ([`FsSource`]) plus the one-pass [`walk_checkout`] driver,
+//!   honouring both ignore layers.
 //! - a parity-harness scaffold (`tests/parity.rs`) that snapshots the graph against a golden.
 
 pub mod chunk;
 pub mod graph;
 pub mod ignore_list;
+pub mod input;
 pub mod lang;
 pub mod pdf;
 pub mod tags;
@@ -31,9 +36,12 @@ pub mod walk;
 pub use chunk::{Chunk, chunk_file, chunk_text};
 pub use graph::{Graph, GraphEdge, GraphNode};
 pub use ignore_list::{DEFAULT_IGNORE_GLOBS, IgnoreConfig, IgnoreList};
+pub use input::{
+    IndexOptions, IndexOutput, IndexStats, Indexer, MAX_INPUT_BYTES, RawInput, index_inputs,
+};
 pub use pdf::{PdfOutcome, extract_from_path as extract_pdf_from_path};
 pub use tuning::IndexTuning;
-pub use walk::{WalkOptions, WalkOutput, WalkStats, walk_checkout, walk_checkout_from_env};
+pub use walk::{FsSource, WalkOptions, walk_checkout, walk_checkout_from_env};
 
 #[cfg(test)]
 mod tests {
@@ -64,7 +72,18 @@ mod tests {
         }
 
         let dir = tempfile::tempdir().unwrap();
-        let out: WalkOutput = walk_checkout(dir.path(), &WalkOptions::builder().build()).unwrap();
-        let _: WalkStats = out.stats;
+        let out: IndexOutput = walk_checkout(dir.path(), &WalkOptions::builder().build()).unwrap();
+        let _: IndexStats = out.stats;
+
+        // The raw-inputs core is directly usable without touching the filesystem at all.
+        let inputs = vec![RawInput::text("f.rs", "fn a() {}\n").with_language("rust")];
+        let options = IndexOptions::builder().build();
+        let raw_out = index_inputs(inputs, &options);
+        assert_eq!(raw_out.chunks.len(), 1);
+
+        let mut indexer = Indexer::new(IndexOptions::builder().build());
+        indexer.push(RawInput::new("g.rs", b"fn b() {}\n".to_vec()));
+        let indexer_out = indexer.finish();
+        assert_eq!(indexer_out.chunks.len(), 1);
     }
 }

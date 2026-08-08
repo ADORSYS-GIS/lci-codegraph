@@ -1,4 +1,4 @@
-//! Black-box test that [`WalkStats`] counters are accurate against a fixture whose composition is
+//! Black-box test that [`IndexStats`] counters are accurate against a fixture whose composition is
 //! known exactly: 2 source files, 2 operator-default-ignored directories (1 entry pruned each), 1
 //! valid PDF, 1 oversized PDF, and 1 malformed PDF.
 

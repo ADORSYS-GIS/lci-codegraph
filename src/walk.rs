@@ -1,25 +1,30 @@
-//! The one-pass walk (ADR-0086). Walks a checkout and produces both the semantic chunks and the
-//! structural graph over **one** tree-sitter parse per file, honouring the repo `.gitignore`
-//! (composed with the operator ignore layer), and routing PDFs through bounded text extraction.
+//! The filesystem *reader* (ADR-0086). [`FsSource`] walks a checkout and produces
+//! [`crate::input::RawInput`]s, honouring the repo `.gitignore` (composed with the operator ignore
+//! layer) and pruning ignored paths before they are ever read. [`walk_checkout`] is a thin driver that
+//! feeds an `FsSource` into `crate::input::Indexer` and returns the result — kept as a convenience
+//! entry point because it remains the crate's primary caller-facing driver.
+//!
+//! `FsSource` is one reader among several possible sources for the indexing core in `crate::input`: a
+//! git object store, a tarball, an HTTP fetch, editor buffers, or DB rows could each implement their
+//! own reader that yields `RawInput`s the same way. The operator ignore layer deliberately lives here,
+//! in the reader, rather than in `crate::input` — filtering which inputs are even worth handing over is
+//! the reader's job, not the content-level indexer's.
 //!
 //! This is the crate's top-level entry point; the agent-plane's `index` mode (and today's
 //! `agent-runner`, behind a flag) drives it and maps the results onto the internal-API payloads.
 
 use std::io::Read as _;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ignore::WalkBuilder;
 
-use crate::chunk::{self, Chunk, MAX_FILE_BYTES};
-use crate::graph::{self, FileSymbols, Graph};
 use crate::ignore_list::{IgnoreConfig, IgnoreList};
-use crate::lang;
-use crate::pdf::{self, PdfOutcome};
+use crate::input::{IndexOptions, IndexOutput, Indexer, MAX_INPUT_BYTES, RawInput};
 use crate::tuning::IndexTuning;
 
-/// Options for [`walk_checkout`]. `bon` builder (≥3 fields, ADR-0083 idiom).
+/// Options for [`FsSource`] / [`walk_checkout`]. `bon` builder (≥3 fields, ADR-0083 idiom).
 #[derive(Debug, Clone, bon::Builder)]
 pub struct WalkOptions {
     /// Chunking/window tuning (carried over verbatim, ADR-0086).
@@ -41,189 +46,132 @@ pub struct WalkOptions {
     pub extra_ignore_globs: Vec<String>,
 }
 
-/// Counters for one walk. Logged so a too-broad ignore glob (or a PDF-heavy repo) is diagnosable.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct WalkStats {
-    pub files_chunked: usize,
-    pub paths_ignored: usize,
-    pub pdfs_extracted: usize,
-    pub pdfs_skipped: usize,
-    /// Files rejected as binary by the content sniff (a NUL byte in the first 512 bytes), despite
-    /// decoding as valid UTF-8 and carrying an indexable extension.
-    ///
-    /// Counted rather than silently dropped: without it, "this repo has fewer indexable files than
-    /// I expected" and "a generated/binary asset is misnamed with a source extension" look exactly
-    /// the same from the summary line — and the second is an actionable repo problem.
-    pub files_skipped_binary: usize,
+/// The FS-reader-specific fields (`respect_gitignore`, `extra_ignore_globs`) have no equivalent in
+/// [`IndexOptions`] — they govern which paths `FsSource` hands over, not how content is indexed once
+/// handed over — so this conversion only carries the three fields both structs share.
+impl From<&WalkOptions> for IndexOptions {
+    fn from(options: &WalkOptions) -> Self {
+        IndexOptions::builder()
+            .tuning(options.tuning)
+            .build_graph(options.build_graph)
+            .extract_pdfs(options.extract_pdfs)
+            .build()
+    }
 }
 
-/// The output of a walk: chunks to embed and the resolved structural graph.
-#[derive(Debug, Default)]
-pub struct WalkOutput {
-    pub chunks: Vec<Chunk>,
-    pub graph: Graph,
-    pub stats: WalkStats,
+/// Reads a filesystem checkout into [`RawInput`]s — the filesystem *reader*, one of several possible
+/// sources for [`crate::input::Indexer`]. Applies both ignore layers (repo `.gitignore` + the operator
+/// glob list) while walking, so a pruned tree is never descended into and a pruned file is never read.
+pub struct FsSource {
+    root: PathBuf,
+    walk: ignore::Walk,
+    ignored: Arc<AtomicUsize>,
+}
+
+impl FsSource {
+    pub fn new(root: &Path, options: &WalkOptions) -> anyhow::Result<Self> {
+        let ignore_list = Arc::new(IgnoreList::build(
+            &IgnoreConfig::builder()
+                .root(root)
+                .extra_globs(options.extra_ignore_globs.clone())
+                .build(),
+        )?);
+        let ignored = Arc::new(AtomicUsize::new(0));
+
+        // Prune the operator-ignored paths (dirs + files) via `filter_entry` so we never descend into a
+        // `node_modules`, while `git_ignore` handles the repo's own rules — the two compose.
+        let mut builder = WalkBuilder::new(root);
+        builder
+            .hidden(false) // don't blanket-skip dotfiles; the ignore lists decide
+            .git_ignore(options.respect_gitignore)
+            .git_global(false) // a machine-global gitignore must not affect indexing determinism
+            .git_exclude(options.respect_gitignore)
+            .parents(options.respect_gitignore)
+            .require_git(false); // honour `.gitignore` even in a non-git fixture dir
+
+        {
+            let ignore_list = Arc::clone(&ignore_list);
+            let ignored = Arc::clone(&ignored);
+            builder.filter_entry(move |entry| {
+                let is_dir = entry.file_type().is_some_and(|ft| ft.is_dir());
+                if ignore_list.is_ignored(entry.path(), is_dir) {
+                    tracing::debug!(path = %entry.path().display(), "codegraph: skipping ignored path");
+                    ignored.fetch_add(1, Ordering::Relaxed);
+                    return false;
+                }
+                true
+            });
+        }
+
+        Ok(Self {
+            root: root.to_path_buf(),
+            walk: builder.build(),
+            ignored,
+        })
+    }
+
+    /// Paths pruned by the ignore layers so far. Final once iteration is exhausted.
+    #[must_use]
+    pub fn paths_ignored(&self) -> usize {
+        self.ignored.load(Ordering::Relaxed)
+    }
+}
+
+impl Iterator for FsSource {
+    type Item = RawInput<'static>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let entry = match self.walk.next()? {
+                Ok(e) => e,
+                Err(error) => {
+                    tracing::warn!(%error, "codegraph: walk entry error");
+                    continue;
+                }
+            };
+            if !entry.file_type().is_some_and(|ft| ft.is_file()) {
+                continue;
+            }
+            let path = entry.path();
+            let rel_path = path
+                .strip_prefix(&self.root)
+                .unwrap_or(path)
+                .to_string_lossy()
+                .replace('\\', "/");
+
+            // Bound the read at the I/O level, not via `metadata().len()`: the file could grow (or be
+            // a pipe/special file) between the stat and the read (TOCTOU), so cap the bytes we
+            // actually pull. Read at most MAX_INPUT_BYTES + 1 — the `+ 1` is so `Indexer::push` can
+            // still see the cap was exceeded (and count it) rather than silently receiving a
+            // truncated input. This is only the outer, reader-side bound: the tighter, per-kind caps
+            // (source vs PDF) are applied by `Indexer::push` once it knows which one applies.
+            let mut bytes = Vec::new();
+            let read = std::fs::File::open(path)
+                .and_then(|f| f.take(MAX_INPUT_BYTES as u64 + 1).read_to_end(&mut bytes));
+            if read.is_err() {
+                continue; // unreadable
+            }
+
+            return Some(RawInput::new(rel_path, bytes));
+        }
+    }
 }
 
 /// Walk `root`, producing chunks + (optionally) the structural graph. Synchronous CPU work — callers
 /// on an async runtime should wrap this in `spawn_blocking` (as `agent-runner` does).
-pub fn walk_checkout(root: &Path, options: &WalkOptions) -> anyhow::Result<WalkOutput> {
-    let ignore_list = Arc::new(IgnoreList::build(
-        &IgnoreConfig::builder()
-            .root(root)
-            .extra_globs(options.extra_ignore_globs.clone())
-            .build(),
-    )?);
-    let ignored_count = Arc::new(AtomicUsize::new(0));
-
-    // Prune the operator-ignored paths (dirs + files) via `filter_entry` so we never descend into a
-    // `node_modules`, while `git_ignore` handles the repo's own rules — the two compose.
-    let mut builder = WalkBuilder::new(root);
-    builder
-        .hidden(false) // don't blanket-skip dotfiles; the ignore lists decide
-        .git_ignore(options.respect_gitignore)
-        .git_global(false) // a machine-global gitignore must not affect indexing determinism
-        .git_exclude(options.respect_gitignore)
-        .parents(options.respect_gitignore)
-        .require_git(false); // honour `.gitignore` even in a non-git fixture dir
-
-    {
-        let ignore_list = Arc::clone(&ignore_list);
-        let ignored_count = Arc::clone(&ignored_count);
-        builder.filter_entry(move |entry| {
-            let is_dir = entry.file_type().is_some_and(|ft| ft.is_dir());
-            if ignore_list.is_ignored(entry.path(), is_dir) {
-                tracing::debug!(path = %entry.path().display(), "codegraph: skipping ignored path");
-                ignored_count.fetch_add(1, Ordering::Relaxed);
-                return false;
-            }
-            true
-        });
+pub fn walk_checkout(root: &Path, options: &WalkOptions) -> anyhow::Result<IndexOutput> {
+    let mut source = FsSource::new(root, options)?;
+    let mut indexer = Indexer::new(IndexOptions::from(options));
+    for input in &mut source {
+        indexer.push(input);
     }
-
-    let mut chunks: Vec<Chunk> = Vec::new();
-    let mut file_symbols: Vec<FileSymbols> = Vec::new();
-    let mut stats = WalkStats::default();
-
-    for result in builder.build() {
-        let entry = match result {
-            Ok(e) => e,
-            Err(error) => {
-                tracing::warn!(%error, "codegraph: walk entry error");
-                continue;
-            }
-        };
-        if !entry.file_type().is_some_and(|ft| ft.is_file()) {
-            continue;
-        }
-        let path = entry.path();
-        let rel_path = path
-            .strip_prefix(root)
-            .unwrap_or(path)
-            .to_string_lossy()
-            .replace('\\', "/");
-
-        // ── PDFs: bounded text extraction → windowed chunks ──────────────────────────────────────
-        if options.extract_pdfs && lang::is_pdf(path) {
-            match pdf::extract_from_path(path) {
-                PdfOutcome::Text(text) => {
-                    let file_chunks = chunk::chunk_text(&rel_path, &text, "pdf", options.tuning);
-                    if !file_chunks.is_empty() {
-                        chunks.extend(file_chunks);
-                        stats.files_chunked += 1;
-                    }
-                    stats.pdfs_extracted += 1;
-                }
-                PdfOutcome::TooLarge => {
-                    tracing::debug!(path = %rel_path, "codegraph: PDF over byte cap, skipped");
-                    stats.pdfs_skipped += 1;
-                }
-                PdfOutcome::Failed(reason) => {
-                    tracing::debug!(path = %rel_path, %reason, "codegraph: PDF extraction failed, skipped");
-                    stats.pdfs_skipped += 1;
-                }
-            }
-            continue;
-        }
-
-        // ── Source / text files ─────────────────────────────────────────────────────────────────
-        let Some(language) = lang::from_path(path) else {
-            continue;
-        };
-        // Bound the read at the I/O level, not via `metadata().len()`: the file could grow (or be a
-        // pipe/special file) between the stat and the read (TOCTOU), so cap the bytes we actually
-        // pull. Read at most MAX_FILE_BYTES + 1 — if we hit the extra byte the file is over cap.
-        let mut source = String::new();
-        let read = std::fs::File::open(path).and_then(|f| {
-            f.take(MAX_FILE_BYTES as u64 + 1)
-                .read_to_string(&mut source)
-        });
-        if read.is_err() {
-            continue; // binary, unreadable, or non-UTF8
-        }
-        if source.len() > MAX_FILE_BYTES {
-            continue; // over the byte cap
-        }
-        // Binary content, caught by CONTENT rather than encoding: NUL is a legal Unicode scalar, so
-        // a binary blob can decode as valid UTF-8 above and still be junk. Rejected here — before
-        // either consumer — so the graph never ingests it either, not just the chunker.
-        if chunk::is_binary(&source) {
-            tracing::debug!(path = %rel_path, "codegraph: binary content, skipped");
-            stats.files_skipped_binary += 1;
-            continue;
-        }
-
-        let file_chunks = if options.build_graph && lang::has_graph(language) {
-            // Parse ONCE and feed both the chunker and the graph builder (ADR-0086 "parse once").
-            if let Some(tree) = lang::parse(&source, language) {
-                file_symbols.push(graph::extract_file(&tree, &rel_path, &source, language));
-                let mut cs = chunk::chunk_tree(&tree, &rel_path, &source, language, options.tuning);
-                if cs.is_empty() {
-                    cs = chunk::chunk_text(&rel_path, &source, language, options.tuning);
-                }
-                cs
-            } else {
-                chunk::chunk_file(&rel_path, &source, language, options.tuning)
-            }
-        } else {
-            chunk::chunk_file(&rel_path, &source, language, options.tuning)
-        };
-
-        if !file_chunks.is_empty() {
-            chunks.extend(file_chunks);
-            stats.files_chunked += 1;
-        }
-    }
-
-    stats.paths_ignored = ignored_count.load(Ordering::Relaxed);
-    let graph = if options.build_graph {
-        graph::resolve(file_symbols)
-    } else {
-        Graph::default()
-    };
-
-    tracing::info!(
-        files_chunked = stats.files_chunked,
-        chunks = chunks.len(),
-        graph_nodes = graph.nodes.len(),
-        graph_edges = graph.edges.len(),
-        paths_ignored = stats.paths_ignored,
-        files_skipped_binary = stats.files_skipped_binary,
-        pdfs_extracted = stats.pdfs_extracted,
-        pdfs_skipped = stats.pdfs_skipped,
-        "codegraph: walk complete"
-    );
-
-    Ok(WalkOutput {
-        chunks,
-        graph,
-        stats,
-    })
+    indexer.record_pruned(source.paths_ignored());
+    Ok(indexer.finish())
 }
 
 /// Convenience: walk reading tuning + operator ignore globs from the environment
 /// (`INDEX_*` and `LCI_CODEGRAPH_IGNORE_GLOBS`) — used by hosts that want env-driven config.
-pub fn walk_checkout_from_env(root: &Path, build_graph: bool) -> anyhow::Result<WalkOutput> {
+pub fn walk_checkout_from_env(root: &Path, build_graph: bool) -> anyhow::Result<IndexOutput> {
     let options = WalkOptions::builder()
         .tuning(IndexTuning::from_env())
         .build_graph(build_graph)
@@ -440,6 +388,38 @@ mod tests {
         let out = walk_checkout(root, &WalkOptions::builder().build()).unwrap();
         assert!(!out.chunks.iter().any(|c| c.file_path.contains("bad.rs")));
         assert!(out.chunks.iter().any(|c| c.file_path.contains("good.rs")));
+    }
+
+    #[test]
+    fn index_options_from_walk_options_carries_only_the_three_shared_fields() {
+        // `IndexOptions` has no `respect_gitignore` or `extra_ignore_globs` field — those govern
+        // which paths `FsSource` hands over, not how content is indexed once handed over — so the
+        // `From` impl must carry exactly `tuning`/`build_graph`/`extract_pdfs` across and be totally
+        // unaffected by the two FS-only fields. Proven here by varying ONLY the FS-only fields
+        // between two `WalkOptions` and asserting their derived `IndexOptions` are equivalent
+        // field-by-field (no `PartialEq` on `IndexOptions`/`IndexTuning`, so this compares by hand).
+        let a = WalkOptions::builder()
+            .respect_gitignore(true)
+            .extra_ignore_globs(vec!["a/".to_string()])
+            .build_graph(true)
+            .extract_pdfs(false)
+            .build();
+        let b = WalkOptions::builder()
+            .respect_gitignore(false)
+            .extra_ignore_globs(vec!["totally-different/".to_string(), "b/".to_string()])
+            .build_graph(true)
+            .extract_pdfs(false)
+            .build();
+
+        let ia = IndexOptions::from(&a);
+        let ib = IndexOptions::from(&b);
+
+        assert_eq!(ia.build_graph, ib.build_graph);
+        assert_eq!(ia.extract_pdfs, ib.extract_pdfs);
+        assert_eq!(ia.tuning.embed_batch_size, ib.tuning.embed_batch_size);
+        assert_eq!(ia.tuning.max_chunk_lines, ib.tuning.max_chunk_lines);
+        assert_eq!(ia.tuning.window_size, ib.tuning.window_size);
+        assert_eq!(ia.tuning.window_step, ib.tuning.window_step);
     }
 
     #[cfg(unix)]

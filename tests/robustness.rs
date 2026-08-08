@@ -127,7 +127,7 @@ fn build_graph_path_rejects_a_nul_laden_blob_exactly_as_chunk_file_does() {
     // with a source extension", and only the second is actionable.
     assert_eq!(
         out.stats.files_skipped_binary, 1,
-        "the binary skip must be visible in WalkStats: {:?}",
+        "the binary skip must be visible in IndexStats: {:?}",
         out.stats
     );
 
