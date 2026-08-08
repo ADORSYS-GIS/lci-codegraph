@@ -338,6 +338,146 @@ fn java_interface_repo_declaration_and_impl_are_both_nodes_but_only_one_is_a_cal
     }
 }
 
+// ── Java: Spring-aware fixture (docs/design/spring-aware-graph.md) ───────────────────────────────
+//
+// PROVISIONAL GOLDEN — read before touching this section. This golden is a snapshot pinned to
+// whatever `lci-codegraph-spring::extract_facts` produces at the moment it was last regenerated
+// (`UPDATE_GOLDEN=1 cargo test --test language_goldens`), not a hand-designed target the crate is
+// implemented against — the crate's own test suite (`crates/lci-codegraph-spring`) is the source of
+// truth for its extraction rules, and this file just proves the *wiring* through `Indexer`/`resolve`
+// is correct end to end: the sibling pass runs, its `FrameworkFacts` reach `graph::resolve`, and the
+// result comes out through `graph::resolve`'s `framework` merge exactly like any other input. If
+// `lci-codegraph-spring`'s extraction rules change (a route path composition fix, a new marker
+// interface added to its repository allowlist, …), this golden drifting is EXPECTED — regenerate it,
+// do not hand-edit the JSON to match a change made elsewhere.
+
+#[test]
+fn spring_repo_graph_matches_committed_golden() {
+    let g = assert_matches_golden("spring-repo");
+    assert!(has_cross_file_call(&g), "edges = {:?}", g.edges);
+    assert!(has_method_nesting(&g), "edges = {:?}", g.edges);
+}
+
+/// Definition-of-done check from the design doc §6: the Phase 1 vocabulary — `route`/`external_service`
+/// nodes, and the `calls` edges that route through them with no resolver change — must actually show up
+/// through this crate's ordinary output, not just exist in `lci-codegraph-spring`'s own unit tests.
+/// Deliberately loose (existence + shape, not exact node_id/line pinning — `assert_matches_golden`
+/// above already pins the byte-exact form): this test's job is to keep meaning something even as the
+/// Spring crate's extraction rules evolve, by asserting the *concepts* the design doc promised are
+/// present, not their current precise encoding.
+#[test]
+fn spring_repo_exercises_the_full_phase_1_vocabulary() {
+    let g = assert_matches_golden("spring-repo");
+
+    // `route` nodes: one per HTTP endpoint `AccountController` serves, not one for `PaymentClient`'s
+    // outbound `@PostMapping` (design doc §2.1 — an outbound Feign request declaration must never be
+    // mistaken for an inbound route).
+    let routes: Vec<_> = g
+        .nodes
+        .iter()
+        .filter(|n| n.node_id.starts_with("route:"))
+        .collect();
+    assert!(
+        !routes.is_empty(),
+        "expected at least one route node for AccountController; nodes = {:?}",
+        g.nodes
+    );
+    assert!(
+        routes
+            .iter()
+            .all(|n| n.source_file == "AccountController.java"),
+        "a route node must point at the handler that serves it, never at PaymentClient's outbound \
+         @PostMapping; routes = {routes:?}"
+    );
+    // Each route dispatches to its handler via a `calls` edge (design doc §2.2: "the container
+    // dispatches to the handler").
+    for route in &routes {
+        assert!(
+            g.edges
+                .iter()
+                .any(|e| e.relation == "calls" && e.source == route.node_id),
+            "route {} must call its handler; edges = {:?}",
+            route.node_id,
+            g.edges
+        );
+    }
+
+    // `external_service` node: one for the `payment-service` Feign boundary, keyed by service name
+    // (design doc §2.1), reached by a `calls` edge from the Feign call site.
+    let service = g
+        .nodes
+        .iter()
+        .find(|n| n.node_id == "service:payment-service")
+        .expect("external_service node for payment-service");
+    assert!(
+        g.edges
+            .iter()
+            .any(|e| e.relation == "calls" && e.target == service.node_id),
+        "expected a calls edge into the payment-service boundary; edges = {:?}",
+        g.edges
+    );
+
+    // Spring Data carve-out (design doc §4.3): `AccountRepository.findByEmail` has no body anywhere
+    // in source, yet is a valid, reachable call target from `AccountServiceImpl.findByEmail`.
+    let repo_method = g
+        .nodes
+        .iter()
+        .find(|n| n.source_file == "AccountRepository.java" && n.label == "findByEmail()")
+        .expect("AccountRepository.findByEmail node");
+    assert!(
+        g.edges
+            .iter()
+            .any(|e| e.relation == "calls" && e.target == repo_method.node_id),
+        "expected a calls edge into the bodiless Spring Data repository method; edges = {:?}",
+        g.edges
+    );
+}
+
+/// The design doc's central, non-Spring finding (§4.2): `AccountController.getAccount` calls
+/// `accountService.findByEmail(email)` through a field typed `AccountService` — an interface with one
+/// implementation, `AccountServiceImpl`. This resolves end-to-end with **zero** Spring knowledge —
+/// `AccountService`/`AccountServiceImpl`/`@Service` never enter the picture — purely from two
+/// already-landed, general Java-resolver facts: issue #5 (a bodiless interface declaration is a node
+/// but not a call-target candidate, so `AccountService.findByEmail` stops competing with
+/// `AccountServiceImpl.findByEmail` for the name) and Phase 0 (the receiver's *declared* type,
+/// `AccountService`, counts as a qualifier match against a sole candidate whose scope is
+/// `AccountServiceImpl`, because `AccountServiceImpl implements AccountService`). This test pins that
+/// finding directly, independent of the provisional-golden caveat above: it must keep passing
+/// unchanged once `lci-codegraph-spring` is implemented, since nothing about it depends on Spring
+/// facts at all.
+#[test]
+fn spring_repo_account_controller_resolves_to_service_impl_via_phase_0_declared_type_qualifier_with_zero_spring_knowledge()
+ {
+    let g = assert_matches_golden("spring-repo");
+    let get_account = g
+        .nodes
+        .iter()
+        .find(|n| n.label == "getAccount()")
+        .expect("AccountController.getAccount node");
+    let targets: Vec<_> = g
+        .edges
+        .iter()
+        .filter(|e| e.relation == "calls" && e.source == get_account.node_id)
+        .collect();
+    assert_eq!(
+        targets.len(),
+        1,
+        "getAccount() must resolve to exactly one target; got {targets:?}"
+    );
+    let dst = g
+        .nodes
+        .iter()
+        .find(|n| n.node_id == targets[0].target)
+        .expect("call target must be an emitted node");
+    assert_eq!(
+        dst.source_file, "AccountServiceImpl.java",
+        "getAccount() must resolve to the implementation, not the AccountService interface \
+         declaration or the AccountRepository method of the same name; edges = {:?}",
+        g.edges
+    );
+    assert_eq!(dst.label, "findByEmail()");
+}
+
 // ── Polyglot (Python + TypeScript + Rust + Java in one checkout) ──────────────────────────────────
 
 #[test]
@@ -385,6 +525,7 @@ fn fixtures_have_no_embedded_git_dir() {
         "java-repo",
         "typescript-interface-repo",
         "java-interface-repo",
+        "spring-repo",
         "polyglot-repo",
     ] {
         let root = fixture_root(name);

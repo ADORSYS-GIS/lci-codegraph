@@ -14,7 +14,10 @@ fn graph_of_lang(language: &str, files: &[(&str, &str)]) -> Graph {
             extract_file(&tree, path, src, language)
         })
         .collect();
-    resolve(facts)
+    // No framework facts here: this module drives `extract_file`/`resolve` directly to test the
+    // language-level pipeline in isolation. `lci-codegraph-spring` is wired in at the `Indexer`
+    // level (`src/input.rs`), not here — see `tests/language_goldens.rs` for the end-to-end path.
+    resolve(facts, Vec::new())
 }
 
 fn graph_of(files: &[(&str, &str)]) -> Graph {
@@ -761,21 +764,16 @@ fn java_call_to_a_single_impl_interface_method_resolves_to_the_implementation() 
 }
 
 #[test]
-fn java_call_through_an_interface_typed_variable_needs_a_qualifier_match() {
-    // FINDING, not fixed here (out of scope — "any change to the resolver's ambiguity policy" is
-    // excluded from issue #5): the issue's own literal reproduction, `g.greet()` where
-    // `g: Greeter`, still does NOT resolve after this fix. `resolve::pick`'s single-candidate
-    // branch rejects a candidate whose scope doesn't textually equal the call's qualifier, and
-    // `qualifier_from_callee_node` sets the qualifier to the raw receiver identifier — here `g`,
-    // the PARAMETER name, not `EnglishGreeter`, the implementing type. There is no type inference in
-    // the tags path, so a receiver variable can never textually match the type that defines the
-    // method it calls. This test documents the boundary of this PR's fix, not a regression: it
-    // passed (found nothing) before this change too, for the SAME underlying reason plus the
-    // declaration-vs-target ambiguity this PR removes — dropping from "ambiguous" to "unresolved"
-    // is not a functional improvement for this exact call shape. Calling through the class name
-    // (`EnglishGreeter.greet()`, next test, and the `java-interface-repo` golden fixture) is the
-    // shape that already works, matching this codebase's existing `Widget.build()`-style qualified
-    // calls in `tests/fixtures/java-repo`.
+fn java_call_through_an_interface_typed_parameter_now_resolves_via_declared_type_qualifier() {
+    // FORMERLY a documented, out-of-scope limitation (issue #5's own boundary note): `g.greet()`
+    // where `g: Greeter` used to NOT resolve, because `qualifier_from_callee_node` set the
+    // qualifier to the raw receiver identifier `g` — the PARAMETER name, not `EnglishGreeter`, the
+    // implementing type — and `resolve::pick` rejected the mismatch. Phase 0
+    // (docs/design/spring-aware-graph.md §4.2, item 2) is exactly this fix:
+    // `callee::declared_type_of` recovers `g`'s declared type (`Greeter`, from its
+    // `formal_parameter`), and `callee::supertype_names` + `resolve::pick`'s supers-aware matching
+    // let that qualifier match `EnglishGreeter` (which `implements Greeter`) instead of reading as
+    // a contradiction. This is the parameter-typed twin of the field-injected case below.
     let greeter = (
         "Greeter.java",
         "interface Greeter {\n    String greet();\n}\n",
@@ -790,9 +788,179 @@ fn java_call_through_an_interface_typed_variable_needs_a_qualifier_match() {
     );
     let g = graph_of_lang("java", &[greeter, english_greeter, main]);
     assert!(
+        has_call(&g, "run()", "greet()"),
+        "g.greet() must now resolve to EnglishGreeter.greet via the recovered declared-type \
+         qualifier; edges = {:?}",
+        g.edges
+    );
+}
+
+// ── Phase 0: declared-type qualifier recovery (docs/design/spring-aware-graph.md §4.2) ────────
+
+#[test]
+fn java_two_class_fixture_with_zero_interfaces_now_produces_a_calls_edge() {
+    // The headline regression from the design doc's §4.2: `Helper h = new Helper(); h.help();`
+    // across two files, with NO interfaces and NO annotations anywhere, used to produce ZERO
+    // `calls` edges — the qualifier recovered from `h.help()` was the bare variable name `"h"`,
+    // which never equals the candidate's scope `"Helper"`. `callee::declared_type_of` fixes this
+    // by recovering `h`'s declared type from its `local_variable_declaration` instead of using the
+    // variable name itself.
+    let helper = ("Helper.java", "class Helper { void help() {} }\n");
+    let caller = (
+        "Caller.java",
+        "class Caller { void run() { Helper h = new Helper(); h.help(); } }\n",
+    );
+    let g = graph_of_lang("java", &[helper, caller]);
+    assert!(
+        has_call(&g, "run()", "help()"),
+        "Helper h = new Helper(); h.help(); must now produce a calls edge; edges = {:?}",
+        g.edges
+    );
+}
+
+#[test]
+fn java_field_injected_interface_typed_call_resolves_to_the_single_implementation() {
+    // The exact motivating shape from the design doc: `accountService.findById(id)`, where
+    // `accountService` is a plain field typed `AccountService` (no annotations — Phase 0 is
+    // general Java, not Spring-specific) and `AccountService` has exactly one implementation.
+    let account_service = (
+        "AccountService.java",
+        "interface AccountService {\n    void findById();\n}\n",
+    );
+    let account_service_impl = (
+        "AccountServiceImpl.java",
+        "class AccountServiceImpl implements AccountService {\n    public void findById() {}\n}\n",
+    );
+    let account_controller = (
+        "AccountController.java",
+        "class AccountController {\n    AccountService accountService;\n    void getAccount() {\n        accountService.findById();\n    }\n}\n",
+    );
+    let g = graph_of_lang(
+        "java",
+        &[account_service, account_service_impl, account_controller],
+    );
+    let get_account = node(&g, "getAccount()");
+    let calls: Vec<_> = g
+        .edges
+        .iter()
+        .filter(|e| e.relation == "calls" && e.source == get_account.node_id)
+        .collect();
+    assert_eq!(
+        calls.len(),
+        1,
+        "getAccount must resolve to exactly one target; got {calls:?}"
+    );
+    let target = g
+        .nodes
+        .iter()
+        .find(|n| n.node_id == calls[0].target)
+        .expect("call target must be an emitted node");
+    assert_eq!(
+        target.source_file, "AccountServiceImpl.java",
+        "accountService.findById() must resolve to the implementation, via the recovered \
+         declared-type qualifier AccountService and its supertype match; edges = {:?}",
+        g.edges
+    );
+}
+
+#[test]
+fn java_local_shadowing_a_field_of_a_different_type_resolves_to_the_locals_type() {
+    // Nearest-enclosing-scope wins: a local variable declared inside the method body shadows a
+    // field of the SAME name but a DIFFERENT type — the call must resolve against the local's
+    // type, not the field's, proving the walk checks the innermost scope first.
+    let widget = ("Widget.java", "class Widget { void render() {} }\n");
+    let panel = ("Panel.java", "class Panel { void render() {} }\n");
+    let screen = (
+        "Screen.java",
+        "class Screen {\n    Widget widget;\n    void draw() {\n        Panel widget = new Panel();\n        widget.render();\n    }\n}\n",
+    );
+    let g = graph_of_lang("java", &[widget, panel, screen]);
+    let draw = node(&g, "draw()");
+    let panel_render = g
+        .nodes
+        .iter()
+        .find(|n| n.label == "render()" && n.source_file == "Panel.java")
+        .expect("Panel.render node");
+    let widget_render = g
+        .nodes
+        .iter()
+        .find(|n| n.label == "render()" && n.source_file == "Widget.java")
+        .expect("Widget.render node");
+    let calls: Vec<_> = g
+        .edges
+        .iter()
+        .filter(|e| e.relation == "calls" && e.source == draw.node_id)
+        .collect();
+    assert_eq!(calls.len(), 1, "exactly one edge; got {calls:?}");
+    assert_eq!(
+        calls[0].target, panel_render.node_id,
+        "the local `Panel widget` must shadow the `Widget widget` field; edges = {:?}",
+        g.edges
+    );
+    assert_ne!(calls[0].target, widget_render.node_id);
+}
+
+#[test]
+fn java_declared_type_that_contradicts_the_only_candidate_still_yields_no_edge() {
+    // Precision preserved: recovering a REAL declared type doesn't turn off contradiction
+    // checking. `f` is declared `Other`, an interface `Foo` never implements — the sole candidate
+    // `Foo.m` must NOT be guessed at just because a declared-type qualifier now exists.
+    let foo = ("Foo.java", "class Foo { void m() {} }\n");
+    let other = ("Other.java", "interface Other {}\n");
+    let bar = (
+        "Bar.java",
+        "class Bar {\n    void run(Other f) {\n        f.m();\n    }\n}\n",
+    );
+    let g = graph_of_lang("java", &[foo, other, bar]);
+    assert!(
         !g.edges.iter().any(|e| e.relation == "calls"),
-        "documents a known, pre-existing, separate limitation — not asserting desired behaviour; \
-         edges = {:?}",
+        "a declared type unrelated to the only candidate must not resolve; edges = {:?}",
+        g.edges
+    );
+}
+
+#[test]
+fn java_call_through_an_unknown_receiver_falls_back_to_bare_identifier_behaviour() {
+    // No local/field/parameter named `obj` is declared anywhere in scope — `declared_type_of`
+    // finds nothing, so the qualifier falls back to the bare identifier text `"obj"`, exactly the
+    // pre-Phase-0 behaviour. `"obj"` doesn't match `Widget`, the only candidate's scope, so this
+    // must still NOT resolve — the fallback must not silently become more lenient.
+    let widget = ("Widget.java", "class Widget { void build() {} }\n");
+    let runner = (
+        "Runner.java",
+        "class Runner {\n    void go() {\n        obj.build();\n    }\n}\n",
+    );
+    let g = graph_of_lang("java", &[widget, runner]);
+    assert!(
+        !g.edges.iter().any(|e| e.relation == "calls"),
+        "an undeclared receiver must fall back to the bare identifier, which doesn't match \
+         Widget; edges = {:?}",
+        g.edges
+    );
+}
+
+#[test]
+fn java_two_implementations_of_one_interface_stay_ambiguous() {
+    // Two genuine bodied implementations of the same interface: candidate count stays > 1 no
+    // matter how the qualifier is resolved, because there truly are two. The resolver must never
+    // guess between them (design doc §4.3 — that is `@Primary`/`@Qualifier` territory, deferred).
+    let service = ("Service.java", "interface Service {\n    void run();\n}\n");
+    let a = (
+        "AImpl.java",
+        "class AImpl implements Service {\n    public void run() {}\n}\n",
+    );
+    let b = (
+        "BImpl.java",
+        "class BImpl implements Service {\n    public void run() {}\n}\n",
+    );
+    let client = (
+        "Client.java",
+        "class Client {\n    void go(Service s) {\n        s.run();\n    }\n}\n",
+    );
+    let g = graph_of_lang("java", &[service, a, b, client]);
+    assert!(
+        !g.edges.iter().any(|e| e.relation == "calls"),
+        "two genuine implementations must stay ambiguous, never guessed; edges = {:?}",
         g.edges
     );
 }
