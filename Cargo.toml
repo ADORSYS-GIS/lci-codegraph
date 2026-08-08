@@ -1,5 +1,10 @@
 [workspace]
 members = ["crates/*"]
+# The sample applications under `examples/apps/` are INPUT for the extractor, not members of this
+# build. Several are real projects in their own right — the Axum one has its own `Cargo.toml` — and
+# without this exclusion cargo would try to fold that manifest into this workspace and fail. They
+# are walked as checkouts by `tests/examples.rs`, never compiled here.
+exclude = ["examples/apps"]
 resolver = "3"
 
 [workspace.package]
@@ -57,10 +62,23 @@ description = "Code-graph extractor: semantic chunking, a cross-file structural 
 readme = "README.md"
 keywords = ["tree-sitter", "code-graph", "static-analysis", "chunking", "indexing"]
 categories = ["development-tools", "parser-implementations"]
-exclude = ["/.github", "/docs", "/tests/fixtures/real-repos"]
+# Auto-discovery off, because `examples/` now holds two different kinds of thing: one real Cargo
+# example target (`dump-graph.rs`, declared below) and `examples/apps/` — sample applications that
+# are *input* to the extractor, not code this crate builds. Auto-discovery would try to compile
+# anything shaped like an example target inside those; naming the one real target prevents it.
+autoexamples = false
+
+# `/examples/apps` holds the sample applications the extractor is demonstrated against — several
+# megabytes of Java/Kotlin/TypeScript/Python source that a consumer of the published crate has no
+# use for. They stay in the repository (and in `tests/examples.rs`) but out of the `.crate` file.
+exclude = ["/.github", "/docs", "/tests/fixtures/real-repos", "/examples/apps"]
 
 [lib]
 path = "src/lib.rs"
+
+[[example]]
+name = "dump-graph"
+path = "examples/dump-graph.rs"
 
 # This crate is a pure extractor: it parses a checkout and returns chunk + graph values. It never
 # talks to a datastore, a cluster, or a forge — hosts map the output onto their own payloads and

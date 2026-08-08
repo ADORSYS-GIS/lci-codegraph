@@ -1,0 +1,219 @@
+{
+  "nodes": [
+    {
+      "node_id": "src/catalog_api/__init__.py",
+      "label": "__init__.py",
+      "source_file": "src/catalog_api/__init__.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/catalog_api/main.py",
+      "label": "main.py",
+      "source_file": "src/catalog_api/main.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/catalog_api/main.py#12:list_products",
+      "label": "list_products()",
+      "source_file": "src/catalog_api/main.py",
+      "start_line": 12
+    },
+    {
+      "node_id": "src/catalog_api/main.py#16:create_product",
+      "label": "create_product()",
+      "source_file": "src/catalog_api/main.py",
+      "start_line": 16
+    },
+    {
+      "node_id": "src/catalog_api/main.py#8:get_product",
+      "label": "get_product()",
+      "source_file": "src/catalog_api/main.py",
+      "start_line": 8
+    },
+    {
+      "node_id": "src/catalog_api/repository.py",
+      "label": "repository.py",
+      "source_file": "src/catalog_api/repository.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/catalog_api/repository.py#10:__init__",
+      "label": "__init__()",
+      "source_file": "src/catalog_api/repository.py",
+      "start_line": 10
+    },
+    {
+      "node_id": "src/catalog_api/repository.py#13:find_by_sku",
+      "label": "find_by_sku()",
+      "source_file": "src/catalog_api/repository.py",
+      "start_line": 13
+    },
+    {
+      "node_id": "src/catalog_api/repository.py#16:find_all",
+      "label": "find_all()",
+      "source_file": "src/catalog_api/repository.py",
+      "start_line": 16
+    },
+    {
+      "node_id": "src/catalog_api/repository.py#19:insert",
+      "label": "insert()",
+      "source_file": "src/catalog_api/repository.py",
+      "start_line": 19
+    },
+    {
+      "node_id": "src/catalog_api/repository.py#4:Product",
+      "label": "Product",
+      "source_file": "src/catalog_api/repository.py",
+      "start_line": 4
+    },
+    {
+      "node_id": "src/catalog_api/repository.py#9:ProductRepository",
+      "label": "ProductRepository",
+      "source_file": "src/catalog_api/repository.py",
+      "start_line": 9
+    },
+    {
+      "node_id": "src/catalog_api/service.py",
+      "label": "service.py",
+      "source_file": "src/catalog_api/service.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/catalog_api/service.py#10:list_all",
+      "label": "list_all()",
+      "source_file": "src/catalog_api/service.py",
+      "start_line": 10
+    },
+    {
+      "node_id": "src/catalog_api/service.py#13:create",
+      "label": "create()",
+      "source_file": "src/catalog_api/service.py",
+      "start_line": 13
+    },
+    {
+      "node_id": "src/catalog_api/service.py#3:ProductService",
+      "label": "ProductService",
+      "source_file": "src/catalog_api/service.py",
+      "start_line": 3
+    },
+    {
+      "node_id": "src/catalog_api/service.py#4:__init__",
+      "label": "__init__()",
+      "source_file": "src/catalog_api/service.py",
+      "start_line": 4
+    },
+    {
+      "node_id": "src/catalog_api/service.py#7:get",
+      "label": "get()",
+      "source_file": "src/catalog_api/service.py",
+      "start_line": 7
+    }
+  ],
+  "edges": [
+    {
+      "source": "src/catalog_api/main.py",
+      "target": "src/catalog_api/main.py#12:list_products",
+      "relation": "contains"
+    },
+    {
+      "source": "src/catalog_api/main.py",
+      "target": "src/catalog_api/main.py#16:create_product",
+      "relation": "contains"
+    },
+    {
+      "source": "src/catalog_api/main.py",
+      "target": "src/catalog_api/main.py#8:get_product",
+      "relation": "contains"
+    },
+    {
+      "source": "src/catalog_api/main.py#12:list_products",
+      "target": "src/catalog_api/service.py#10:list_all",
+      "relation": "calls"
+    },
+    {
+      "source": "src/catalog_api/main.py#16:create_product",
+      "target": "src/catalog_api/service.py#13:create",
+      "relation": "calls"
+    },
+    {
+      "source": "src/catalog_api/main.py#8:get_product",
+      "target": "src/catalog_api/service.py#7:get",
+      "relation": "calls"
+    },
+    {
+      "source": "src/catalog_api/repository.py",
+      "target": "src/catalog_api/repository.py#4:Product",
+      "relation": "contains"
+    },
+    {
+      "source": "src/catalog_api/repository.py",
+      "target": "src/catalog_api/repository.py#9:ProductRepository",
+      "relation": "contains"
+    },
+    {
+      "source": "src/catalog_api/repository.py#13:find_by_sku",
+      "target": "src/catalog_api/service.py#7:get",
+      "relation": "calls"
+    },
+    {
+      "source": "src/catalog_api/repository.py#9:ProductRepository",
+      "target": "src/catalog_api/repository.py#10:__init__",
+      "relation": "method"
+    },
+    {
+      "source": "src/catalog_api/repository.py#9:ProductRepository",
+      "target": "src/catalog_api/repository.py#13:find_by_sku",
+      "relation": "method"
+    },
+    {
+      "source": "src/catalog_api/repository.py#9:ProductRepository",
+      "target": "src/catalog_api/repository.py#16:find_all",
+      "relation": "method"
+    },
+    {
+      "source": "src/catalog_api/repository.py#9:ProductRepository",
+      "target": "src/catalog_api/repository.py#19:insert",
+      "relation": "method"
+    },
+    {
+      "source": "src/catalog_api/service.py",
+      "target": "src/catalog_api/service.py#3:ProductService",
+      "relation": "contains"
+    },
+    {
+      "source": "src/catalog_api/service.py#10:list_all",
+      "target": "src/catalog_api/repository.py#16:find_all",
+      "relation": "calls"
+    },
+    {
+      "source": "src/catalog_api/service.py#13:create",
+      "target": "src/catalog_api/repository.py#19:insert",
+      "relation": "calls"
+    },
+    {
+      "source": "src/catalog_api/service.py#3:ProductService",
+      "target": "src/catalog_api/service.py#10:list_all",
+      "relation": "method"
+    },
+    {
+      "source": "src/catalog_api/service.py#3:ProductService",
+      "target": "src/catalog_api/service.py#13:create",
+      "relation": "method"
+    },
+    {
+      "source": "src/catalog_api/service.py#3:ProductService",
+      "target": "src/catalog_api/service.py#4:__init__",
+      "relation": "method"
+    },
+    {
+      "source": "src/catalog_api/service.py#3:ProductService",
+      "target": "src/catalog_api/service.py#7:get",
+      "relation": "method"
+    },
+    {
+      "source": "src/catalog_api/service.py#7:get",
+      "target": "src/catalog_api/repository.py#13:find_by_sku",
+      "relation": "calls"
+    }
+  ]
+}

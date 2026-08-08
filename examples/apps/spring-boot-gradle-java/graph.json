@@ -1,0 +1,446 @@
+{
+  "nodes": [
+    {
+      "node_id": "route:GET:/admin/inventory",
+      "label": "GET /admin/inventory",
+      "source_file": "src/main/java/com/example/inventory/api/AdminController.java",
+      "start_line": 15
+    },
+    {
+      "node_id": "route:GET:/admin/stock",
+      "label": "GET /admin/stock",
+      "source_file": "src/main/java/com/example/inventory/api/AdminController.java",
+      "start_line": 15
+    },
+    {
+      "node_id": "route:GET:/api/stock/{sku}",
+      "label": "GET /api/stock/{sku}",
+      "source_file": "src/main/java/com/example/inventory/api/StockController.java",
+      "start_line": 15
+    },
+    {
+      "node_id": "route:HEAD:/api/stock/health",
+      "label": "HEAD /api/stock/health",
+      "source_file": "src/main/java/com/example/inventory/api/StockController.java",
+      "start_line": 30
+    },
+    {
+      "node_id": "route:PATCH:/api/stock/{sku}/reserve",
+      "label": "PATCH /api/stock/{sku}/reserve",
+      "source_file": "src/main/java/com/example/inventory/api/StockController.java",
+      "start_line": 25
+    },
+    {
+      "node_id": "route:PUT:/api/stock/{sku}",
+      "label": "PUT /api/stock/{sku}",
+      "source_file": "src/main/java/com/example/inventory/api/StockController.java",
+      "start_line": 20
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/InventoryApplication.java",
+      "label": "InventoryApplication.java",
+      "source_file": "src/main/java/com/example/inventory/InventoryApplication.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/InventoryApplication.java#6:InventoryApplication",
+      "label": "InventoryApplication",
+      "source_file": "src/main/java/com/example/inventory/InventoryApplication.java",
+      "start_line": 6
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/InventoryApplication.java#8:main",
+      "label": "main()",
+      "source_file": "src/main/java/com/example/inventory/InventoryApplication.java",
+      "start_line": 8
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/api/AdminController.java",
+      "label": "AdminController.java",
+      "source_file": "src/main/java/com/example/inventory/api/AdminController.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/api/AdminController.java#15:adminView",
+      "label": "adminView()",
+      "source_file": "src/main/java/com/example/inventory/api/AdminController.java",
+      "start_line": 15
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/api/AdminController.java#7:AdminController",
+      "label": "AdminController",
+      "source_file": "src/main/java/com/example/inventory/api/AdminController.java",
+      "start_line": 7
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/api/StockController.java",
+      "label": "StockController.java",
+      "source_file": "src/main/java/com/example/inventory/api/StockController.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/api/StockController.java#15:getStock",
+      "label": "getStock()",
+      "source_file": "src/main/java/com/example/inventory/api/StockController.java",
+      "start_line": 15
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/api/StockController.java#20:updateStock",
+      "label": "updateStock()",
+      "source_file": "src/main/java/com/example/inventory/api/StockController.java",
+      "start_line": 20
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/api/StockController.java#25:reserveStock",
+      "label": "reserveStock()",
+      "source_file": "src/main/java/com/example/inventory/api/StockController.java",
+      "start_line": 25
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/api/StockController.java#30:head",
+      "label": "head()",
+      "source_file": "src/main/java/com/example/inventory/api/StockController.java",
+      "start_line": 30
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/api/StockController.java#6:StockController",
+      "label": "StockController",
+      "source_file": "src/main/java/com/example/inventory/api/StockController.java",
+      "start_line": 6
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/repo/StockItem.java",
+      "label": "StockItem.java",
+      "source_file": "src/main/java/com/example/inventory/repo/StockItem.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/repo/StockItem.java#11:getId",
+      "label": "getId()",
+      "source_file": "src/main/java/com/example/inventory/repo/StockItem.java",
+      "start_line": 11
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/repo/StockItem.java#15:getSku",
+      "label": "getSku()",
+      "source_file": "src/main/java/com/example/inventory/repo/StockItem.java",
+      "start_line": 15
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/repo/StockItem.java#19:getQuantity",
+      "label": "getQuantity()",
+      "source_file": "src/main/java/com/example/inventory/repo/StockItem.java",
+      "start_line": 19
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/repo/StockItem.java#5:StockItem",
+      "label": "StockItem",
+      "source_file": "src/main/java/com/example/inventory/repo/StockItem.java",
+      "start_line": 5
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/repo/StockRepository.java",
+      "label": "StockRepository.java",
+      "source_file": "src/main/java/com/example/inventory/repo/StockRepository.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/repo/StockRepository.java#6:StockRepository",
+      "label": "StockRepository",
+      "source_file": "src/main/java/com/example/inventory/repo/StockRepository.java",
+      "start_line": 6
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/repo/StockRepository.java#8:findBySkuIgnoreCase",
+      "label": "findBySkuIgnoreCase()",
+      "source_file": "src/main/java/com/example/inventory/repo/StockRepository.java",
+      "start_line": 8
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/service/StockService.java",
+      "label": "StockService.java",
+      "source_file": "src/main/java/com/example/inventory/service/StockService.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/service/StockService.java#3:StockService",
+      "label": "StockService",
+      "source_file": "src/main/java/com/example/inventory/service/StockService.java",
+      "start_line": 3
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/service/StockService.java#4:findBySku",
+      "label": "findBySku()",
+      "source_file": "src/main/java/com/example/inventory/service/StockService.java",
+      "start_line": 4
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/service/StockService.java#5:updateStock",
+      "label": "updateStock()",
+      "source_file": "src/main/java/com/example/inventory/service/StockService.java",
+      "start_line": 5
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/service/StockService.java#6:reserve",
+      "label": "reserve()",
+      "source_file": "src/main/java/com/example/inventory/service/StockService.java",
+      "start_line": 6
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/service/StockService.java#7:health",
+      "label": "health()",
+      "source_file": "src/main/java/com/example/inventory/service/StockService.java",
+      "start_line": 7
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/service/StockService.java#8:getAdminStats",
+      "label": "getAdminStats()",
+      "source_file": "src/main/java/com/example/inventory/service/StockService.java",
+      "start_line": 8
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/service/StockServiceImpl.java",
+      "label": "StockServiceImpl.java",
+      "source_file": "src/main/java/com/example/inventory/service/StockServiceImpl.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/service/StockServiceImpl.java#14:findBySku",
+      "label": "findBySku()",
+      "source_file": "src/main/java/com/example/inventory/service/StockServiceImpl.java",
+      "start_line": 14
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/service/StockServiceImpl.java#19:updateStock",
+      "label": "updateStock()",
+      "source_file": "src/main/java/com/example/inventory/service/StockServiceImpl.java",
+      "start_line": 19
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/service/StockServiceImpl.java#24:reserve",
+      "label": "reserve()",
+      "source_file": "src/main/java/com/example/inventory/service/StockServiceImpl.java",
+      "start_line": 24
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/service/StockServiceImpl.java#29:health",
+      "label": "health()",
+      "source_file": "src/main/java/com/example/inventory/service/StockServiceImpl.java",
+      "start_line": 29
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/service/StockServiceImpl.java#34:getAdminStats",
+      "label": "getAdminStats()",
+      "source_file": "src/main/java/com/example/inventory/service/StockServiceImpl.java",
+      "start_line": 34
+    },
+    {
+      "node_id": "src/main/java/com/example/inventory/service/StockServiceImpl.java#6:StockServiceImpl",
+      "label": "StockServiceImpl",
+      "source_file": "src/main/java/com/example/inventory/service/StockServiceImpl.java",
+      "start_line": 6
+    }
+  ],
+  "edges": [
+    {
+      "source": "route:GET:/admin/inventory",
+      "target": "src/main/java/com/example/inventory/api/AdminController.java#15:adminView",
+      "relation": "calls"
+    },
+    {
+      "source": "route:GET:/admin/stock",
+      "target": "src/main/java/com/example/inventory/api/AdminController.java#15:adminView",
+      "relation": "calls"
+    },
+    {
+      "source": "route:GET:/api/stock/{sku}",
+      "target": "src/main/java/com/example/inventory/api/StockController.java#15:getStock",
+      "relation": "calls"
+    },
+    {
+      "source": "route:HEAD:/api/stock/health",
+      "target": "src/main/java/com/example/inventory/api/StockController.java#30:head",
+      "relation": "calls"
+    },
+    {
+      "source": "route:PATCH:/api/stock/{sku}/reserve",
+      "target": "src/main/java/com/example/inventory/api/StockController.java#25:reserveStock",
+      "relation": "calls"
+    },
+    {
+      "source": "route:PUT:/api/stock/{sku}",
+      "target": "src/main/java/com/example/inventory/api/StockController.java#20:updateStock",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/InventoryApplication.java",
+      "target": "src/main/java/com/example/inventory/InventoryApplication.java#6:InventoryApplication",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/InventoryApplication.java#6:InventoryApplication",
+      "target": "src/main/java/com/example/inventory/InventoryApplication.java#8:main",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/api/AdminController.java",
+      "target": "src/main/java/com/example/inventory/api/AdminController.java#7:AdminController",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/api/AdminController.java#15:adminView",
+      "target": "src/main/java/com/example/inventory/service/StockServiceImpl.java#34:getAdminStats",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/api/AdminController.java#7:AdminController",
+      "target": "src/main/java/com/example/inventory/api/AdminController.java#15:adminView",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/api/StockController.java",
+      "target": "src/main/java/com/example/inventory/api/StockController.java#6:StockController",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/api/StockController.java#15:getStock",
+      "target": "src/main/java/com/example/inventory/service/StockServiceImpl.java#14:findBySku",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/api/StockController.java#20:updateStock",
+      "target": "src/main/java/com/example/inventory/service/StockServiceImpl.java#19:updateStock",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/api/StockController.java#25:reserveStock",
+      "target": "src/main/java/com/example/inventory/service/StockServiceImpl.java#24:reserve",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/api/StockController.java#30:head",
+      "target": "src/main/java/com/example/inventory/service/StockServiceImpl.java#29:health",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/api/StockController.java#6:StockController",
+      "target": "src/main/java/com/example/inventory/api/StockController.java#15:getStock",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/api/StockController.java#6:StockController",
+      "target": "src/main/java/com/example/inventory/api/StockController.java#20:updateStock",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/api/StockController.java#6:StockController",
+      "target": "src/main/java/com/example/inventory/api/StockController.java#25:reserveStock",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/api/StockController.java#6:StockController",
+      "target": "src/main/java/com/example/inventory/api/StockController.java#30:head",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/repo/StockItem.java",
+      "target": "src/main/java/com/example/inventory/repo/StockItem.java#5:StockItem",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/repo/StockItem.java#5:StockItem",
+      "target": "src/main/java/com/example/inventory/repo/StockItem.java#11:getId",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/repo/StockItem.java#5:StockItem",
+      "target": "src/main/java/com/example/inventory/repo/StockItem.java#15:getSku",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/repo/StockItem.java#5:StockItem",
+      "target": "src/main/java/com/example/inventory/repo/StockItem.java#19:getQuantity",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/repo/StockRepository.java",
+      "target": "src/main/java/com/example/inventory/repo/StockRepository.java#6:StockRepository",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/repo/StockRepository.java#6:StockRepository",
+      "target": "src/main/java/com/example/inventory/repo/StockRepository.java#8:findBySkuIgnoreCase",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/service/StockService.java",
+      "target": "src/main/java/com/example/inventory/service/StockService.java#3:StockService",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/service/StockService.java#3:StockService",
+      "target": "src/main/java/com/example/inventory/service/StockService.java#4:findBySku",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/service/StockService.java#3:StockService",
+      "target": "src/main/java/com/example/inventory/service/StockService.java#5:updateStock",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/service/StockService.java#3:StockService",
+      "target": "src/main/java/com/example/inventory/service/StockService.java#6:reserve",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/service/StockService.java#3:StockService",
+      "target": "src/main/java/com/example/inventory/service/StockService.java#7:health",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/service/StockService.java#3:StockService",
+      "target": "src/main/java/com/example/inventory/service/StockService.java#8:getAdminStats",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/service/StockServiceImpl.java",
+      "target": "src/main/java/com/example/inventory/service/StockServiceImpl.java#6:StockServiceImpl",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/service/StockServiceImpl.java#14:findBySku",
+      "target": "src/main/java/com/example/inventory/repo/StockRepository.java#8:findBySkuIgnoreCase",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/service/StockServiceImpl.java#19:updateStock",
+      "target": "src/main/java/com/example/inventory/repo/StockRepository.java#8:findBySkuIgnoreCase",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/service/StockServiceImpl.java#6:StockServiceImpl",
+      "target": "src/main/java/com/example/inventory/service/StockServiceImpl.java#14:findBySku",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/service/StockServiceImpl.java#6:StockServiceImpl",
+      "target": "src/main/java/com/example/inventory/service/StockServiceImpl.java#19:updateStock",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/service/StockServiceImpl.java#6:StockServiceImpl",
+      "target": "src/main/java/com/example/inventory/service/StockServiceImpl.java#24:reserve",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/service/StockServiceImpl.java#6:StockServiceImpl",
+      "target": "src/main/java/com/example/inventory/service/StockServiceImpl.java#29:health",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/inventory/service/StockServiceImpl.java#6:StockServiceImpl",
+      "target": "src/main/java/com/example/inventory/service/StockServiceImpl.java#34:getAdminStats",
+      "relation": "method"
+    }
+  ]
+}

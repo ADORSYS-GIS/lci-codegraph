@@ -1,0 +1,523 @@
+{
+  "nodes": [
+    {
+      "node_id": "route:DELETE:/api/orders/{id}",
+      "label": "DELETE /api/orders/{id}",
+      "source_file": "src/main/java/com/example/orders/web/OrderController.java",
+      "start_line": 37
+    },
+    {
+      "node_id": "route:GET:/api/orders",
+      "label": "GET /api/orders",
+      "source_file": "src/main/java/com/example/orders/web/OrderController.java",
+      "start_line": 22
+    },
+    {
+      "node_id": "route:GET:/api/orders/by-customer/{email}",
+      "label": "GET /api/orders/by-customer/{email}",
+      "source_file": "src/main/java/com/example/orders/web/OrderController.java",
+      "start_line": 27
+    },
+    {
+      "node_id": "route:GET:/api/orders/{id}",
+      "label": "GET /api/orders/{id}",
+      "source_file": "src/main/java/com/example/orders/web/OrderController.java",
+      "start_line": 17
+    },
+    {
+      "node_id": "route:POST:/api/orders",
+      "label": "POST /api/orders",
+      "source_file": "src/main/java/com/example/orders/web/OrderController.java",
+      "start_line": 32
+    },
+    {
+      "node_id": "service:shipping-service",
+      "label": "shipping-service",
+      "source_file": "src/main/java/com/example/orders/client/ShippingClient.java",
+      "start_line": 8
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/OrdersApplication.java",
+      "label": "OrdersApplication.java",
+      "source_file": "src/main/java/com/example/orders/OrdersApplication.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/OrdersApplication.java#10:main",
+      "label": "main()",
+      "source_file": "src/main/java/com/example/orders/OrdersApplication.java",
+      "start_line": 10
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/OrdersApplication.java#7:OrdersApplication",
+      "label": "OrdersApplication",
+      "source_file": "src/main/java/com/example/orders/OrdersApplication.java",
+      "start_line": 7
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/client/ShippingClient.java",
+      "label": "ShippingClient.java",
+      "source_file": "src/main/java/com/example/orders/client/ShippingClient.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/client/ShippingClient.java#10:requestPickup",
+      "label": "requestPickup()",
+      "source_file": "src/main/java/com/example/orders/client/ShippingClient.java",
+      "start_line": 10
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/client/ShippingClient.java#13:trackShipment",
+      "label": "trackShipment()",
+      "source_file": "src/main/java/com/example/orders/client/ShippingClient.java",
+      "start_line": 13
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/client/ShippingClient.java#8:ShippingClient",
+      "label": "ShippingClient",
+      "source_file": "src/main/java/com/example/orders/client/ShippingClient.java",
+      "start_line": 8
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/repo/Order.java",
+      "label": "Order.java",
+      "source_file": "src/main/java/com/example/orders/repo/Order.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/repo/Order.java#16:getId",
+      "label": "getId()",
+      "source_file": "src/main/java/com/example/orders/repo/Order.java",
+      "start_line": 16
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/repo/Order.java#20:getCustomerName",
+      "label": "getCustomerName()",
+      "source_file": "src/main/java/com/example/orders/repo/Order.java",
+      "start_line": 20
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/repo/Order.java#24:getCustomerEmail",
+      "label": "getCustomerEmail()",
+      "source_file": "src/main/java/com/example/orders/repo/Order.java",
+      "start_line": 24
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/repo/Order.java#28:getTotalPrice",
+      "label": "getTotalPrice()",
+      "source_file": "src/main/java/com/example/orders/repo/Order.java",
+      "start_line": 28
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/repo/Order.java#32:setCustomerName",
+      "label": "setCustomerName()",
+      "source_file": "src/main/java/com/example/orders/repo/Order.java",
+      "start_line": 32
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/repo/Order.java#36:setCustomerEmail",
+      "label": "setCustomerEmail()",
+      "source_file": "src/main/java/com/example/orders/repo/Order.java",
+      "start_line": 36
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/repo/Order.java#40:setTotalPrice",
+      "label": "setTotalPrice()",
+      "source_file": "src/main/java/com/example/orders/repo/Order.java",
+      "start_line": 40
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/repo/Order.java#5:Order",
+      "label": "Order",
+      "source_file": "src/main/java/com/example/orders/repo/Order.java",
+      "start_line": 5
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/repo/OrderRepository.java",
+      "label": "OrderRepository.java",
+      "source_file": "src/main/java/com/example/orders/repo/OrderRepository.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/repo/OrderRepository.java#17:OrderRepository",
+      "label": "OrderRepository",
+      "source_file": "src/main/java/com/example/orders/repo/OrderRepository.java",
+      "start_line": 17
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/repo/OrderRepository.java#19:findByCustomerEmail",
+      "label": "findByCustomerEmail()",
+      "source_file": "src/main/java/com/example/orders/repo/OrderRepository.java",
+      "start_line": 19
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/repo/OrderRepository.java#21:findByTotalPriceGreaterThan",
+      "label": "findByTotalPriceGreaterThan()",
+      "source_file": "src/main/java/com/example/orders/repo/OrderRepository.java",
+      "start_line": 21
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/service/OrderService.java",
+      "label": "OrderService.java",
+      "source_file": "src/main/java/com/example/orders/service/OrderService.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/service/OrderService.java#10:findByCustomerEmail",
+      "label": "findByCustomerEmail()",
+      "source_file": "src/main/java/com/example/orders/service/OrderService.java",
+      "start_line": 10
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/service/OrderService.java#12:delete",
+      "label": "delete()",
+      "source_file": "src/main/java/com/example/orders/service/OrderService.java",
+      "start_line": 12
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/service/OrderService.java#6:OrderService",
+      "label": "OrderService",
+      "source_file": "src/main/java/com/example/orders/service/OrderService.java",
+      "start_line": 6
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/service/OrderService.java#7:findById",
+      "label": "findById()",
+      "source_file": "src/main/java/com/example/orders/service/OrderService.java",
+      "start_line": 7
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/service/OrderService.java#8:findAll",
+      "label": "findAll()",
+      "source_file": "src/main/java/com/example/orders/service/OrderService.java",
+      "start_line": 8
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/service/OrderService.java#9:create",
+      "label": "create()",
+      "source_file": "src/main/java/com/example/orders/service/OrderService.java",
+      "start_line": 9
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/service/OrderServiceImpl.java",
+      "label": "OrderServiceImpl.java",
+      "source_file": "src/main/java/com/example/orders/service/OrderServiceImpl.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/service/OrderServiceImpl.java#19:findById",
+      "label": "findById()",
+      "source_file": "src/main/java/com/example/orders/service/OrderServiceImpl.java",
+      "start_line": 19
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/service/OrderServiceImpl.java#24:findAll",
+      "label": "findAll()",
+      "source_file": "src/main/java/com/example/orders/service/OrderServiceImpl.java",
+      "start_line": 24
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/service/OrderServiceImpl.java#29:findByCustomerEmail",
+      "label": "findByCustomerEmail()",
+      "source_file": "src/main/java/com/example/orders/service/OrderServiceImpl.java",
+      "start_line": 29
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/service/OrderServiceImpl.java#34:create",
+      "label": "create()",
+      "source_file": "src/main/java/com/example/orders/service/OrderServiceImpl.java",
+      "start_line": 34
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/service/OrderServiceImpl.java#41:delete",
+      "label": "delete()",
+      "source_file": "src/main/java/com/example/orders/service/OrderServiceImpl.java",
+      "start_line": 41
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/service/OrderServiceImpl.java#9:OrderServiceImpl",
+      "label": "OrderServiceImpl",
+      "source_file": "src/main/java/com/example/orders/service/OrderServiceImpl.java",
+      "start_line": 9
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/web/OrderController.java",
+      "label": "OrderController.java",
+      "source_file": "src/main/java/com/example/orders/web/OrderController.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/web/OrderController.java#17:getOrder",
+      "label": "getOrder()",
+      "source_file": "src/main/java/com/example/orders/web/OrderController.java",
+      "start_line": 17
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/web/OrderController.java#22:listOrders",
+      "label": "listOrders()",
+      "source_file": "src/main/java/com/example/orders/web/OrderController.java",
+      "start_line": 22
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/web/OrderController.java#27:findByCustomer",
+      "label": "findByCustomer()",
+      "source_file": "src/main/java/com/example/orders/web/OrderController.java",
+      "start_line": 27
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/web/OrderController.java#32:createOrder",
+      "label": "createOrder()",
+      "source_file": "src/main/java/com/example/orders/web/OrderController.java",
+      "start_line": 32
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/web/OrderController.java#37:deleteOrder",
+      "label": "deleteOrder()",
+      "source_file": "src/main/java/com/example/orders/web/OrderController.java",
+      "start_line": 37
+    },
+    {
+      "node_id": "src/main/java/com/example/orders/web/OrderController.java#8:OrderController",
+      "label": "OrderController",
+      "source_file": "src/main/java/com/example/orders/web/OrderController.java",
+      "start_line": 8
+    }
+  ],
+  "edges": [
+    {
+      "source": "route:DELETE:/api/orders/{id}",
+      "target": "src/main/java/com/example/orders/web/OrderController.java#37:deleteOrder",
+      "relation": "calls"
+    },
+    {
+      "source": "route:GET:/api/orders",
+      "target": "src/main/java/com/example/orders/web/OrderController.java#22:listOrders",
+      "relation": "calls"
+    },
+    {
+      "source": "route:GET:/api/orders/by-customer/{email}",
+      "target": "src/main/java/com/example/orders/web/OrderController.java#27:findByCustomer",
+      "relation": "calls"
+    },
+    {
+      "source": "route:GET:/api/orders/{id}",
+      "target": "src/main/java/com/example/orders/web/OrderController.java#17:getOrder",
+      "relation": "calls"
+    },
+    {
+      "source": "route:POST:/api/orders",
+      "target": "src/main/java/com/example/orders/web/OrderController.java#32:createOrder",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/orders/OrdersApplication.java",
+      "target": "src/main/java/com/example/orders/OrdersApplication.java#7:OrdersApplication",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/orders/OrdersApplication.java#7:OrdersApplication",
+      "target": "src/main/java/com/example/orders/OrdersApplication.java#10:main",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/client/ShippingClient.java",
+      "target": "src/main/java/com/example/orders/client/ShippingClient.java#8:ShippingClient",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/orders/client/ShippingClient.java#8:ShippingClient",
+      "target": "src/main/java/com/example/orders/client/ShippingClient.java#10:requestPickup",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/client/ShippingClient.java#8:ShippingClient",
+      "target": "src/main/java/com/example/orders/client/ShippingClient.java#13:trackShipment",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/repo/Order.java",
+      "target": "src/main/java/com/example/orders/repo/Order.java#5:Order",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/orders/repo/Order.java#5:Order",
+      "target": "src/main/java/com/example/orders/repo/Order.java#16:getId",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/repo/Order.java#5:Order",
+      "target": "src/main/java/com/example/orders/repo/Order.java#20:getCustomerName",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/repo/Order.java#5:Order",
+      "target": "src/main/java/com/example/orders/repo/Order.java#24:getCustomerEmail",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/repo/Order.java#5:Order",
+      "target": "src/main/java/com/example/orders/repo/Order.java#28:getTotalPrice",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/repo/Order.java#5:Order",
+      "target": "src/main/java/com/example/orders/repo/Order.java#32:setCustomerName",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/repo/Order.java#5:Order",
+      "target": "src/main/java/com/example/orders/repo/Order.java#36:setCustomerEmail",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/repo/Order.java#5:Order",
+      "target": "src/main/java/com/example/orders/repo/Order.java#40:setTotalPrice",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/repo/OrderRepository.java",
+      "target": "src/main/java/com/example/orders/repo/OrderRepository.java#17:OrderRepository",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/orders/repo/OrderRepository.java#17:OrderRepository",
+      "target": "src/main/java/com/example/orders/repo/OrderRepository.java#19:findByCustomerEmail",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/repo/OrderRepository.java#17:OrderRepository",
+      "target": "src/main/java/com/example/orders/repo/OrderRepository.java#21:findByTotalPriceGreaterThan",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderService.java",
+      "target": "src/main/java/com/example/orders/service/OrderService.java#6:OrderService",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderService.java#6:OrderService",
+      "target": "src/main/java/com/example/orders/service/OrderService.java#10:findByCustomerEmail",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderService.java#6:OrderService",
+      "target": "src/main/java/com/example/orders/service/OrderService.java#12:delete",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderService.java#6:OrderService",
+      "target": "src/main/java/com/example/orders/service/OrderService.java#7:findById",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderService.java#6:OrderService",
+      "target": "src/main/java/com/example/orders/service/OrderService.java#8:findAll",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderService.java#6:OrderService",
+      "target": "src/main/java/com/example/orders/service/OrderService.java#9:create",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderServiceImpl.java",
+      "target": "src/main/java/com/example/orders/service/OrderServiceImpl.java#9:OrderServiceImpl",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderServiceImpl.java#29:findByCustomerEmail",
+      "target": "src/main/java/com/example/orders/repo/OrderRepository.java#19:findByCustomerEmail",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderServiceImpl.java#34:create",
+      "target": "service:shipping-service",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderServiceImpl.java#34:create",
+      "target": "src/main/java/com/example/orders/repo/Order.java#16:getId",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderServiceImpl.java#9:OrderServiceImpl",
+      "target": "src/main/java/com/example/orders/service/OrderServiceImpl.java#19:findById",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderServiceImpl.java#9:OrderServiceImpl",
+      "target": "src/main/java/com/example/orders/service/OrderServiceImpl.java#24:findAll",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderServiceImpl.java#9:OrderServiceImpl",
+      "target": "src/main/java/com/example/orders/service/OrderServiceImpl.java#29:findByCustomerEmail",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderServiceImpl.java#9:OrderServiceImpl",
+      "target": "src/main/java/com/example/orders/service/OrderServiceImpl.java#34:create",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/service/OrderServiceImpl.java#9:OrderServiceImpl",
+      "target": "src/main/java/com/example/orders/service/OrderServiceImpl.java#41:delete",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/web/OrderController.java",
+      "target": "src/main/java/com/example/orders/web/OrderController.java#8:OrderController",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/orders/web/OrderController.java#17:getOrder",
+      "target": "src/main/java/com/example/orders/service/OrderServiceImpl.java#19:findById",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/orders/web/OrderController.java#22:listOrders",
+      "target": "src/main/java/com/example/orders/service/OrderServiceImpl.java#24:findAll",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/orders/web/OrderController.java#27:findByCustomer",
+      "target": "src/main/java/com/example/orders/service/OrderServiceImpl.java#29:findByCustomerEmail",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/orders/web/OrderController.java#32:createOrder",
+      "target": "src/main/java/com/example/orders/service/OrderServiceImpl.java#34:create",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/orders/web/OrderController.java#37:deleteOrder",
+      "target": "src/main/java/com/example/orders/service/OrderServiceImpl.java#41:delete",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/orders/web/OrderController.java#8:OrderController",
+      "target": "src/main/java/com/example/orders/web/OrderController.java#17:getOrder",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/web/OrderController.java#8:OrderController",
+      "target": "src/main/java/com/example/orders/web/OrderController.java#22:listOrders",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/web/OrderController.java#8:OrderController",
+      "target": "src/main/java/com/example/orders/web/OrderController.java#27:findByCustomer",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/web/OrderController.java#8:OrderController",
+      "target": "src/main/java/com/example/orders/web/OrderController.java#32:createOrder",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/orders/web/OrderController.java#8:OrderController",
+      "target": "src/main/java/com/example/orders/web/OrderController.java#37:deleteOrder",
+      "relation": "method"
+    }
+  ]
+}

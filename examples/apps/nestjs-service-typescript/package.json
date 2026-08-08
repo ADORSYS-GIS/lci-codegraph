@@ -1,0 +1,14 @@
+{
+  "name": "notifications-api",
+  "version": "1.0.0",
+  "main": "dist/main.js",
+  "dependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/core": "^10.0.0",
+    "reflect-metadata": "^0.1.13",
+    "rxjs": "^7.8.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

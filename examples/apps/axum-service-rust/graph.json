@@ -1,0 +1,285 @@
+{
+  "nodes": [
+    {
+      "node_id": "src/handlers.rs",
+      "label": "handlers.rs",
+      "source_file": "src/handlers.rs",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/handlers.rs#12:CreateTicketRequest",
+      "label": "CreateTicketRequest",
+      "source_file": "src/handlers.rs",
+      "start_line": 12
+    },
+    {
+      "node_id": "src/handlers.rs#16:list_tickets",
+      "label": "list_tickets()",
+      "source_file": "src/handlers.rs",
+      "start_line": 16
+    },
+    {
+      "node_id": "src/handlers.rs#23:get_ticket",
+      "label": "get_ticket()",
+      "source_file": "src/handlers.rs",
+      "start_line": 23
+    },
+    {
+      "node_id": "src/handlers.rs#33:create_ticket",
+      "label": "create_ticket()",
+      "source_file": "src/handlers.rs",
+      "start_line": 33
+    },
+    {
+      "node_id": "src/main.rs",
+      "label": "main.rs",
+      "source_file": "src/main.rs",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main.rs#12:router",
+      "label": "router()",
+      "source_file": "src/main.rs",
+      "start_line": 12
+    },
+    {
+      "node_id": "src/main.rs#1:handlers",
+      "label": "handlers",
+      "source_file": "src/main.rs",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main.rs#24:main",
+      "label": "main()",
+      "source_file": "src/main.rs",
+      "start_line": 24
+    },
+    {
+      "node_id": "src/main.rs#2:repo",
+      "label": "repo",
+      "source_file": "src/main.rs",
+      "start_line": 2
+    },
+    {
+      "node_id": "src/main.rs#3:state",
+      "label": "state",
+      "source_file": "src/main.rs",
+      "start_line": 3
+    },
+    {
+      "node_id": "src/repo.rs",
+      "label": "repo.rs",
+      "source_file": "src/repo.rs",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/repo.rs#14:impl",
+      "label": "impl",
+      "source_file": "src/repo.rs",
+      "start_line": 14
+    },
+    {
+      "node_id": "src/repo.rs#15:new",
+      "label": "new()",
+      "source_file": "src/repo.rs",
+      "start_line": 15
+    },
+    {
+      "node_id": "src/repo.rs#22:find_all",
+      "label": "find_all()",
+      "source_file": "src/repo.rs",
+      "start_line": 22
+    },
+    {
+      "node_id": "src/repo.rs#26:find_by_id",
+      "label": "find_by_id()",
+      "source_file": "src/repo.rs",
+      "start_line": 26
+    },
+    {
+      "node_id": "src/repo.rs#30:insert",
+      "label": "insert()",
+      "source_file": "src/repo.rs",
+      "start_line": 30
+    },
+    {
+      "node_id": "src/repo.rs#37:next_id",
+      "label": "next_id()",
+      "source_file": "src/repo.rs",
+      "start_line": 37
+    },
+    {
+      "node_id": "src/repo.rs#4:Ticket",
+      "label": "Ticket",
+      "source_file": "src/repo.rs",
+      "start_line": 4
+    },
+    {
+      "node_id": "src/repo.rs#9:TicketRepo",
+      "label": "TicketRepo",
+      "source_file": "src/repo.rs",
+      "start_line": 9
+    },
+    {
+      "node_id": "src/state.rs",
+      "label": "state.rs",
+      "source_file": "src/state.rs",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/state.rs#10:new",
+      "label": "new()",
+      "source_file": "src/state.rs",
+      "start_line": 10
+    },
+    {
+      "node_id": "src/state.rs#5:AppState",
+      "label": "AppState",
+      "source_file": "src/state.rs",
+      "start_line": 5
+    },
+    {
+      "node_id": "src/state.rs#9:impl",
+      "label": "impl",
+      "source_file": "src/state.rs",
+      "start_line": 9
+    }
+  ],
+  "edges": [
+    {
+      "source": "src/handlers.rs",
+      "target": "src/handlers.rs#12:CreateTicketRequest",
+      "relation": "contains"
+    },
+    {
+      "source": "src/handlers.rs",
+      "target": "src/handlers.rs#16:list_tickets",
+      "relation": "contains"
+    },
+    {
+      "source": "src/handlers.rs",
+      "target": "src/handlers.rs#23:get_ticket",
+      "relation": "contains"
+    },
+    {
+      "source": "src/handlers.rs",
+      "target": "src/handlers.rs#33:create_ticket",
+      "relation": "contains"
+    },
+    {
+      "source": "src/handlers.rs#16:list_tickets",
+      "target": "src/repo.rs#22:find_all",
+      "relation": "calls"
+    },
+    {
+      "source": "src/handlers.rs#23:get_ticket",
+      "target": "src/repo.rs#26:find_by_id",
+      "relation": "calls"
+    },
+    {
+      "source": "src/handlers.rs#33:create_ticket",
+      "target": "src/repo.rs#30:insert",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main.rs",
+      "target": "src/main.rs#12:router",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.rs",
+      "target": "src/main.rs#1:handlers",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.rs",
+      "target": "src/main.rs#24:main",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.rs",
+      "target": "src/main.rs#2:repo",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.rs",
+      "target": "src/main.rs#3:state",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.rs#12:router",
+      "target": "src/state.rs#10:new",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main.rs#24:main",
+      "target": "src/main.rs#12:router",
+      "relation": "calls"
+    },
+    {
+      "source": "src/repo.rs",
+      "target": "src/repo.rs#14:impl",
+      "relation": "contains"
+    },
+    {
+      "source": "src/repo.rs",
+      "target": "src/repo.rs#4:Ticket",
+      "relation": "contains"
+    },
+    {
+      "source": "src/repo.rs",
+      "target": "src/repo.rs#9:TicketRepo",
+      "relation": "contains"
+    },
+    {
+      "source": "src/repo.rs#14:impl",
+      "target": "src/repo.rs#15:new",
+      "relation": "method"
+    },
+    {
+      "source": "src/repo.rs#14:impl",
+      "target": "src/repo.rs#22:find_all",
+      "relation": "method"
+    },
+    {
+      "source": "src/repo.rs#14:impl",
+      "target": "src/repo.rs#26:find_by_id",
+      "relation": "method"
+    },
+    {
+      "source": "src/repo.rs#14:impl",
+      "target": "src/repo.rs#30:insert",
+      "relation": "method"
+    },
+    {
+      "source": "src/repo.rs#14:impl",
+      "target": "src/repo.rs#37:next_id",
+      "relation": "method"
+    },
+    {
+      "source": "src/repo.rs#30:insert",
+      "target": "src/repo.rs#37:next_id",
+      "relation": "calls"
+    },
+    {
+      "source": "src/state.rs",
+      "target": "src/state.rs#5:AppState",
+      "relation": "contains"
+    },
+    {
+      "source": "src/state.rs",
+      "target": "src/state.rs#9:impl",
+      "relation": "contains"
+    },
+    {
+      "source": "src/state.rs#10:new",
+      "target": "src/repo.rs#15:new",
+      "relation": "calls"
+    },
+    {
+      "source": "src/state.rs#9:impl",
+      "target": "src/state.rs#10:new",
+      "relation": "method"
+    }
+  ]
+}

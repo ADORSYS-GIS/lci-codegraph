@@ -1,0 +1,226 @@
+{
+  "nodes": [
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java",
+      "label": "AuditEventListenerProvider.java",
+      "source_file": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java#12:AuditEventListenerProvider",
+      "label": "AuditEventListenerProvider",
+      "source_file": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java",
+      "start_line": 12
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java#22:onEvent",
+      "label": "onEvent()",
+      "source_file": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java",
+      "start_line": 22
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java#27:onEvent",
+      "label": "onEvent()",
+      "source_file": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java",
+      "start_line": 27
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java#32:close",
+      "label": "close()",
+      "source_file": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java",
+      "start_line": 32
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java",
+      "label": "AuditEventListenerProviderFactory.java",
+      "source_file": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#14:AuditEventListenerProviderFactory",
+      "label": "AuditEventListenerProviderFactory",
+      "source_file": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java",
+      "start_line": 14
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#18:create",
+      "label": "create()",
+      "source_file": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java",
+      "start_line": 18
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#23:init",
+      "label": "init()",
+      "source_file": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java",
+      "start_line": 23
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#28:postInit",
+      "label": "postInit()",
+      "source_file": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java",
+      "start_line": 28
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#33:close",
+      "label": "close()",
+      "source_file": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java",
+      "start_line": 33
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#38:getId",
+      "label": "getId()",
+      "source_file": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java",
+      "start_line": 38
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditSink.java",
+      "label": "AuditSink.java",
+      "source_file": "src/main/java/com/example/keycloak/AuditSink.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditSink.java#15:record",
+      "label": "record()",
+      "source_file": "src/main/java/com/example/keycloak/AuditSink.java",
+      "start_line": 15
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditSink.java#20:flush",
+      "label": "flush()",
+      "source_file": "src/main/java/com/example/keycloak/AuditSink.java",
+      "start_line": 20
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/AuditSink.java#7:AuditSink",
+      "label": "AuditSink",
+      "source_file": "src/main/java/com/example/keycloak/AuditSink.java",
+      "start_line": 7
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/LoggingAuditSink.java",
+      "label": "LoggingAuditSink.java",
+      "source_file": "src/main/java/com/example/keycloak/LoggingAuditSink.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/LoggingAuditSink.java#13:record",
+      "label": "record()",
+      "source_file": "src/main/java/com/example/keycloak/LoggingAuditSink.java",
+      "start_line": 13
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/LoggingAuditSink.java#19:flush",
+      "label": "flush()",
+      "source_file": "src/main/java/com/example/keycloak/LoggingAuditSink.java",
+      "start_line": 19
+    },
+    {
+      "node_id": "src/main/java/com/example/keycloak/LoggingAuditSink.java#9:LoggingAuditSink",
+      "label": "LoggingAuditSink",
+      "source_file": "src/main/java/com/example/keycloak/LoggingAuditSink.java",
+      "start_line": 9
+    }
+  ],
+  "edges": [
+    {
+      "source": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java",
+      "target": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java#12:AuditEventListenerProvider",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java#12:AuditEventListenerProvider",
+      "target": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java#22:onEvent",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java#12:AuditEventListenerProvider",
+      "target": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java#27:onEvent",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java#12:AuditEventListenerProvider",
+      "target": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java#32:close",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java#22:onEvent",
+      "target": "src/main/java/com/example/keycloak/LoggingAuditSink.java#13:record",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java#27:onEvent",
+      "target": "src/main/java/com/example/keycloak/LoggingAuditSink.java#13:record",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditEventListenerProvider.java#32:close",
+      "target": "src/main/java/com/example/keycloak/LoggingAuditSink.java#19:flush",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java",
+      "target": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#14:AuditEventListenerProviderFactory",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#14:AuditEventListenerProviderFactory",
+      "target": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#18:create",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#14:AuditEventListenerProviderFactory",
+      "target": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#23:init",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#14:AuditEventListenerProviderFactory",
+      "target": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#28:postInit",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#14:AuditEventListenerProviderFactory",
+      "target": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#33:close",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#14:AuditEventListenerProviderFactory",
+      "target": "src/main/java/com/example/keycloak/AuditEventListenerProviderFactory.java#38:getId",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditSink.java",
+      "target": "src/main/java/com/example/keycloak/AuditSink.java#7:AuditSink",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditSink.java#7:AuditSink",
+      "target": "src/main/java/com/example/keycloak/AuditSink.java#15:record",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/AuditSink.java#7:AuditSink",
+      "target": "src/main/java/com/example/keycloak/AuditSink.java#20:flush",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/LoggingAuditSink.java",
+      "target": "src/main/java/com/example/keycloak/LoggingAuditSink.java#9:LoggingAuditSink",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/LoggingAuditSink.java#13:record",
+      "target": "src/main/java/com/example/keycloak/LoggingAuditSink.java#19:flush",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/LoggingAuditSink.java#9:LoggingAuditSink",
+      "target": "src/main/java/com/example/keycloak/LoggingAuditSink.java#13:record",
+      "relation": "method"
+    },
+    {
+      "source": "src/main/java/com/example/keycloak/LoggingAuditSink.java#9:LoggingAuditSink",
+      "target": "src/main/java/com/example/keycloak/LoggingAuditSink.java#19:flush",
+      "relation": "method"
+    }
+  ]
+}
