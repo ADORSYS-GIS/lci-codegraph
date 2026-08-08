@@ -19,22 +19,82 @@
       "start_line": 5
     },
     {
+      "node_id": "src/gizmo.js",
+      "label": "gizmo.js",
+      "source_file": "src/gizmo.js",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/gizmo.js#1:Gizmo",
+      "label": "Gizmo",
+      "source_file": "src/gizmo.js",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/gizmo.js#2:spin",
+      "label": "spin()",
+      "source_file": "src/gizmo.js",
+      "start_line": 2
+    },
+    {
+      "node_id": "src/lefty.js",
+      "label": "lefty.js",
+      "source_file": "src/lefty.js",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/lefty.js#1:Lefty",
+      "label": "Lefty",
+      "source_file": "src/lefty.js",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/lefty.js#2:orbit",
+      "label": "orbit()",
+      "source_file": "src/lefty.js",
+      "start_line": 2
+    },
+    {
+      "node_id": "src/lefty.js#7:Righty",
+      "label": "Righty",
+      "source_file": "src/lefty.js",
+      "start_line": 7
+    },
+    {
+      "node_id": "src/lefty.js#8:orbit",
+      "label": "orbit()",
+      "source_file": "src/lefty.js",
+      "start_line": 8
+    },
+    {
       "node_id": "src/main.js",
       "label": "main.js",
       "source_file": "src/main.js",
       "start_line": 1
     },
     {
-      "node_id": "src/main.js#4:run",
-      "label": "run()",
-      "source_file": "src/main.js",
-      "start_line": 4
-    },
-    {
-      "node_id": "src/main.js#9:runBare",
+      "node_id": "src/main.js#11:runBare",
       "label": "runBare()",
       "source_file": "src/main.js",
-      "start_line": 9
+      "start_line": 11
+    },
+    {
+      "node_id": "src/main.js#21:runViaVariable",
+      "label": "runViaVariable()",
+      "source_file": "src/main.js",
+      "start_line": 21
+    },
+    {
+      "node_id": "src/main.js#29:runAmbiguousViaVariable",
+      "label": "runAmbiguousViaVariable()",
+      "source_file": "src/main.js",
+      "start_line": 29
+    },
+    {
+      "node_id": "src/main.js#6:run",
+      "label": "run()",
+      "source_file": "src/main.js",
+      "start_line": 6
     },
     {
       "node_id": "src/util.js",
@@ -108,22 +168,67 @@
       "relation": "calls"
     },
     {
+      "source": "src/gizmo.js",
+      "target": "src/gizmo.js#1:Gizmo",
+      "relation": "contains"
+    },
+    {
+      "source": "src/gizmo.js#1:Gizmo",
+      "target": "src/gizmo.js#2:spin",
+      "relation": "method"
+    },
+    {
+      "source": "src/lefty.js",
+      "target": "src/lefty.js#1:Lefty",
+      "relation": "contains"
+    },
+    {
+      "source": "src/lefty.js",
+      "target": "src/lefty.js#7:Righty",
+      "relation": "contains"
+    },
+    {
+      "source": "src/lefty.js#1:Lefty",
+      "target": "src/lefty.js#2:orbit",
+      "relation": "method"
+    },
+    {
+      "source": "src/lefty.js#7:Righty",
+      "target": "src/lefty.js#8:orbit",
+      "relation": "method"
+    },
+    {
       "source": "src/main.js",
-      "target": "src/main.js#4:run",
+      "target": "src/main.js#11:runBare",
       "relation": "contains"
     },
     {
       "source": "src/main.js",
-      "target": "src/main.js#9:runBare",
+      "target": "src/main.js#21:runViaVariable",
       "relation": "contains"
     },
     {
-      "source": "src/main.js#4:run",
+      "source": "src/main.js",
+      "target": "src/main.js#29:runAmbiguousViaVariable",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.js",
+      "target": "src/main.js#6:run",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.js#21:runViaVariable",
+      "target": "src/gizmo.js#2:spin",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main.js#6:run",
       "target": "src/util.js#5:caller",
       "relation": "calls"
     },
     {
-      "source": "src/main.js#4:run",
+      "source": "src/main.js#6:run",
       "target": "src/widgets.js#2:build",
       "relation": "calls"
     },

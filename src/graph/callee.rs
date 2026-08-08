@@ -79,9 +79,11 @@ fn type_head_name(node: &Node<'_>, bytes: &[u8]) -> Option<String> {
 }
 
 /// The qualifier for a tags-captured callee name node: its receiver, when the name is the property of
-/// a member access (`Foo.bar()` → `Foo`; Python `obj.m()` / Java `Obj.m()`). A bare call
-/// (`function`-field identifier) or a `self`/`this`/`cls`/`super` receiver yields no qualifier — the
-/// call resolves on the bare name (single hit) or is dropped as ambiguous, never mis-attributed.
+/// a member access AND the receiver is plausibly a type (`Foo.bar()` → `Foo`; Java `Obj.m()`). A bare
+/// call (`function`-field identifier), a `self`/`this`/`cls`/`super` receiver, or a **value** receiver
+/// (a lowercase-initial variable/module, e.g. `obj` in `obj.foo()` — see [`receiver_qualifier`])
+/// yields no qualifier — the call resolves on the bare name (single hit) or is dropped as ambiguous,
+/// never mis-attributed.
 pub(super) fn qualifier_from_callee_node(name_node: &Node<'_>, bytes: &[u8]) -> Option<String> {
     let parent = name_node.parent()?;
     match parent.kind() {
@@ -97,6 +99,28 @@ pub(super) fn qualifier_from_callee_node(name_node: &Node<'_>, bytes: &[u8]) -> 
 /// `Foo.bar()`). Implicit-`self` receivers (`self`/`cls`/`this`/`super`) carry no type information, so
 /// they yield no qualifier — the call resolves on the bare method name (single hit) or is dropped as
 /// ambiguous, never mis-attributed by a bogus `self` qualifier.
+///
+/// The same is true, and for the same reason, of a **value** receiver — a local variable holding an
+/// instance (`a` in `a.helper()`) or a module (`math` in `math.sqrt()`). This extractor has no type
+/// inference: it cannot tell what `a` was assigned, so a qualifier built from `a`'s own text would
+/// almost never equal the callable's declaring-type `scope` (`A`) and [`super::resolve::pick`]'s
+/// single-candidate branch would reject the one correct candidate — issue #8. We use the Java/
+/// TypeScript/Python naming convention (types/classes are capitalised; variables and modules are not)
+/// as a cheap, no-inference proxy for "is this plausibly a type": a capitalised identifier stays a
+/// qualifier (`Foo.bar()`, and the constant-receiver case `CONFIG.get()`, which reads as a type/
+/// singular-instance qualifier under the same convention and is accepted on the same terms); a
+/// lowercase-initial identifier yields `None` and the call falls through to bare-name resolution,
+/// exactly like `foo()` — single candidate resolves, several candidates with no qualifier are dropped
+/// as ambiguous.
+///
+/// Precision trade-off: dropping the qualifier means `a.run()` could resolve to the single `run`
+/// defined on a class `a` was never actually assigned. This is deliberately no *new* risk — a bare
+/// `run()` call already resolves to a lone same-named candidate with zero type checking, and every
+/// value-receiver call the old code silently discarded is textually indistinguishable from a bare
+/// call once its (never-matching) qualifier is set aside. This makes value-receiver calls behave like
+/// bare calls instead of manufacturing a false negative that dominates real codebases (see issue #8:
+/// this is the single most common call shape in idiomatic Java/TS/Python and was recording zero
+/// `calls` edges for all of it).
 fn receiver_qualifier(object: &Node<'_>, bytes: &[u8]) -> Option<String> {
     if object.kind() != "identifier" {
         return None;
@@ -104,8 +128,17 @@ fn receiver_qualifier(object: &Node<'_>, bytes: &[u8]) -> Option<String> {
     let name = text(object, bytes)?;
     match name.as_str() {
         "self" | "cls" | "this" | "super" => None,
-        _ => Some(name),
+        _ if is_type_like(&name) => Some(name),
+        _ => None,
     }
+}
+
+/// Java/TypeScript/Python naming convention: a capitalised identifier plausibly names a *type*
+/// (`Foo`, or an all-caps constant like `CONFIG`); a lowercase-initial identifier names a *value* — a
+/// local variable or a module (`a`, `math`) — whose actual type this extractor does not track. See
+/// [`receiver_qualifier`] for how this is used and why.
+fn is_type_like(name: &str) -> bool {
+    name.chars().next().is_some_and(char::is_uppercase)
 }
 
 fn text(node: &Node<'_>, bytes: &[u8]) -> Option<String> {
@@ -294,27 +327,90 @@ mod tests {
     }
 
     #[test]
-    fn python_attribute_receiver_is_the_qualifier() {
-        with_tagged_node("obj.m()", "python", "attribute", |attr, bytes| {
+    fn python_capitalised_attribute_receiver_is_the_qualifier() {
+        // `Obj.m()` — a capitalised receiver plausibly names a type, so it stays a qualifier.
+        with_tagged_node("Obj.m()", "python", "attribute", |attr, bytes| {
             let name_node = attr.child_by_field_name("attribute").unwrap();
             assert_eq!(
                 qualifier_from_callee_node(&name_node, bytes).as_deref(),
-                Some("obj")
+                Some("Obj")
             );
         });
     }
 
     #[test]
-    fn java_method_invocation_receiver_is_the_qualifier() {
+    fn java_capitalised_method_invocation_receiver_is_the_qualifier() {
+        // `Obj.m()` — a capitalised receiver plausibly names a type, so it stays a qualifier.
         with_tagged_node(
-            "class C { void go() { obj.m(); } }",
+            "class C { void go() { Obj.m(); } }",
             "java",
             "method_invocation",
             |call, bytes| {
                 let name_node = call.child_by_field_name("name").unwrap();
                 assert_eq!(
                     qualifier_from_callee_node(&name_node, bytes).as_deref(),
-                    Some("obj")
+                    Some("Obj")
+                );
+            },
+        );
+    }
+
+    // ── issue #8: a lowercase-initial (value) receiver yields NO qualifier ─────────────────────────
+
+    #[test]
+    fn python_lowercase_attribute_receiver_yields_no_qualifier() {
+        // `obj.m()` — `obj` is a variable, not a type; recording it as a qualifier is exactly issue
+        // #8 (the qualifier can never textually match the callable's declaring-type scope, so the
+        // one correct candidate gets rejected). No qualifier lets the call fall through to bare-name
+        // resolution instead.
+        with_tagged_node("obj.m()", "python", "attribute", |attr, bytes| {
+            let name_node = attr.child_by_field_name("attribute").unwrap();
+            assert_eq!(qualifier_from_callee_node(&name_node, bytes), None);
+        });
+    }
+
+    #[test]
+    fn java_lowercase_method_invocation_receiver_yields_no_qualifier() {
+        // `obj.m()` — same as the Python case above: a value receiver, not a type.
+        with_tagged_node(
+            "class C { void go() { obj.m(); } }",
+            "java",
+            "method_invocation",
+            |call, bytes| {
+                let name_node = call.child_by_field_name("name").unwrap();
+                assert_eq!(qualifier_from_callee_node(&name_node, bytes), None);
+            },
+        );
+    }
+
+    #[test]
+    fn js_lowercase_member_expression_receiver_yields_no_qualifier() {
+        // `a.helper()` — the exact reproduction shape from issue #8.
+        with_tagged_node(
+            "a.helper();",
+            "javascript",
+            "member_expression",
+            |member, bytes| {
+                let name_node = member.child_by_field_name("property").unwrap();
+                assert_eq!(qualifier_from_callee_node(&name_node, bytes), None);
+            },
+        );
+    }
+
+    #[test]
+    fn all_caps_constant_receiver_is_still_treated_as_a_type_qualifier() {
+        // `CONFIG.get()` — an all-caps identifier is capitalised, so it stays a qualifier under the
+        // same convention as `Foo.bar()`. Documented, accepted trade-off: see `receiver_qualifier`'s
+        // doc comment.
+        with_tagged_node(
+            "CONFIG.get();",
+            "javascript",
+            "member_expression",
+            |member, bytes| {
+                let name_node = member.child_by_field_name("property").unwrap();
+                assert_eq!(
+                    qualifier_from_callee_node(&name_node, bytes).as_deref(),
+                    Some("CONFIG")
                 );
             },
         );

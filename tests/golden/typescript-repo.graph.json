@@ -1,22 +1,82 @@
 {
   "nodes": [
     {
+      "node_id": "src/gizmo.ts",
+      "label": "gizmo.ts",
+      "source_file": "src/gizmo.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/gizmo.ts#1:Gizmo",
+      "label": "Gizmo",
+      "source_file": "src/gizmo.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/gizmo.ts#2:spin",
+      "label": "spin()",
+      "source_file": "src/gizmo.ts",
+      "start_line": 2
+    },
+    {
+      "node_id": "src/lefty.ts",
+      "label": "lefty.ts",
+      "source_file": "src/lefty.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/lefty.ts#1:Lefty",
+      "label": "Lefty",
+      "source_file": "src/lefty.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/lefty.ts#2:orbit",
+      "label": "orbit()",
+      "source_file": "src/lefty.ts",
+      "start_line": 2
+    },
+    {
+      "node_id": "src/lefty.ts#7:Righty",
+      "label": "Righty",
+      "source_file": "src/lefty.ts",
+      "start_line": 7
+    },
+    {
+      "node_id": "src/lefty.ts#8:orbit",
+      "label": "orbit()",
+      "source_file": "src/lefty.ts",
+      "start_line": 8
+    },
+    {
       "node_id": "src/main.ts",
       "label": "main.ts",
       "source_file": "src/main.ts",
       "start_line": 1
     },
     {
-      "node_id": "src/main.ts#4:run",
-      "label": "run()",
-      "source_file": "src/main.ts",
-      "start_line": 4
-    },
-    {
-      "node_id": "src/main.ts#9:runBare",
+      "node_id": "src/main.ts#11:runBare",
       "label": "runBare()",
       "source_file": "src/main.ts",
-      "start_line": 9
+      "start_line": 11
+    },
+    {
+      "node_id": "src/main.ts#21:runViaVariable",
+      "label": "runViaVariable()",
+      "source_file": "src/main.ts",
+      "start_line": 21
+    },
+    {
+      "node_id": "src/main.ts#29:runAmbiguousViaVariable",
+      "label": "runAmbiguousViaVariable()",
+      "source_file": "src/main.ts",
+      "start_line": 29
+    },
+    {
+      "node_id": "src/main.ts#6:run",
+      "label": "run()",
+      "source_file": "src/main.ts",
+      "start_line": 6
     },
     {
       "node_id": "src/service.ts",
@@ -75,22 +135,67 @@
   ],
   "edges": [
     {
+      "source": "src/gizmo.ts",
+      "target": "src/gizmo.ts#1:Gizmo",
+      "relation": "contains"
+    },
+    {
+      "source": "src/gizmo.ts#1:Gizmo",
+      "target": "src/gizmo.ts#2:spin",
+      "relation": "method"
+    },
+    {
+      "source": "src/lefty.ts",
+      "target": "src/lefty.ts#1:Lefty",
+      "relation": "contains"
+    },
+    {
+      "source": "src/lefty.ts",
+      "target": "src/lefty.ts#7:Righty",
+      "relation": "contains"
+    },
+    {
+      "source": "src/lefty.ts#1:Lefty",
+      "target": "src/lefty.ts#2:orbit",
+      "relation": "method"
+    },
+    {
+      "source": "src/lefty.ts#7:Righty",
+      "target": "src/lefty.ts#8:orbit",
+      "relation": "method"
+    },
+    {
       "source": "src/main.ts",
-      "target": "src/main.ts#4:run",
+      "target": "src/main.ts#11:runBare",
       "relation": "contains"
     },
     {
       "source": "src/main.ts",
-      "target": "src/main.ts#9:runBare",
+      "target": "src/main.ts#21:runViaVariable",
       "relation": "contains"
     },
     {
-      "source": "src/main.ts#4:run",
+      "source": "src/main.ts",
+      "target": "src/main.ts#29:runAmbiguousViaVariable",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.ts",
+      "target": "src/main.ts#6:run",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.ts#21:runViaVariable",
+      "target": "src/gizmo.ts#2:spin",
+      "relation": "calls"
+    },
+    {
+      "source": "src/main.ts#6:run",
       "target": "src/service.ts#2:build",
       "relation": "calls"
     },
     {
-      "source": "src/main.ts#4:run",
+      "source": "src/main.ts#6:run",
       "target": "src/util.ts#5:caller",
       "relation": "calls"
     },
