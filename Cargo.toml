@@ -22,7 +22,14 @@ path = "src/lib.rs"
 
 # This crate is a pure extractor: it parses a checkout and returns chunk + graph values. It never
 # talks to a datastore, a cluster, or a forge — hosts map the output onto their own payloads and
-# submit. Keep that boundary: no kube/sqlx/http clients belong in `[dependencies]`.
+# submit. Keep that boundary: no kube/sqlx/forge clients belong in `[dependencies]`.
+#
+# ONE deliberate exception: `ureq`, for the optional embeddings HTTP call (`src/embed/`). Embedding
+# is the one step in this crate's job that is *inherently* a network round-trip to a model endpoint —
+# there is no local/in-process model, so "extractor talks to nothing" and "the crate can embed" are
+# incompatible, and we chose to keep embedding in-crate rather than push every host into re-implementing
+# batching/truncation/retry against the graph-aware context header. It stays a narrow exception: still
+# no kube/sqlx/forge client, and the embeddings call is the ONLY thing `ureq` is used for.
 [dependencies]
 anyhow = "1.0.103"
 serde = { version = "1.0.228", features = ["derive"] }
@@ -53,6 +60,13 @@ pdf-extract = "0.12"
 # Pre-flight, *bounded* inflate of a PDF's content streams to catch a decompression bomb BEFORE
 # `pdf-extract` (which wraps `lopdf`/`flate2`) inflates them unbounded.
 flate2 = "1"
+# Blocking HTTP client for the OpenAI-compatible `/embeddings` call. Deliberately blocking, not async:
+# `walk_checkout` is synchronous CPU work that hosts already wrap in `spawn_blocking` (see `src/walk.rs`
+# doc comment), so a blocking client keeps that contract instead of forcing an async runtime onto every
+# consumer just for this one optional call. Already resolved in `Cargo.lock` at 3.3.0 via the
+# `container-tests` dev chain (rustls+ring defaults), so this adds no new TLS stack and no new licence
+# surface for `cargo-deny`.
+ureq = "3.3"
 
 [dev-dependencies]
 tempfile = "3.27"

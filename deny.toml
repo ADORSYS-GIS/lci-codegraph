@@ -67,6 +67,13 @@ allow = [
     "ISC",
     "Unicode-3.0",
     "Zlib",
+    # `webpki-roots` only — the bundled Mozilla CA root store `ureq`'s default rustls backend uses to
+    # verify the embeddings endpoint's certificate. CDLA-Permissive-2.0 is the Community Data License
+    # Agreement, a permissive *data* licence with no copyleft and no attribution requirement on
+    # downstream binaries; it applies to the certificate data, not to any code linked into this crate.
+    # Reviewed and added deliberately when `ureq` became a normal dependency — the allow-list caught it
+    # exactly as the note above intends, rather than letting it in silently.
+    "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.8
 

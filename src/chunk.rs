@@ -14,8 +14,11 @@ use crate::lang;
 pub const MAX_FILE_BYTES: usize = 5 * 1024 * 1024;
 
 /// One embeddable unit of source. `Serialize` is derived so the parity harness can snapshot chunk
-/// output as a golden; the field set mirrors `agent-clients::ChunkPayload` (minus the embedding).
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+/// output as a golden; the field set mirrors `agent-clients::ChunkPayload`.
+///
+/// No longer `Eq` (only `PartialEq`): `embedding` is a `Vec<f32>`, and floats have no total order.
+/// Verified safe — no `HashSet`/`BTreeSet`/`Ord`/`dedup` use of `Chunk` exists anywhere in this crate.
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct Chunk {
     pub file_path: String,
     pub language: String,
@@ -24,6 +27,17 @@ pub struct Chunk {
     pub start_line: i32,
     pub end_line: i32,
     pub content: String,
+    /// The embedding vector, set by `embed::embed_chunks` once this chunk is configured to be
+    /// embedded. `None` for every chunk when embedding is off, or before the embed step runs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedding: Option<Vec<f32>>,
+    /// The exact text that was (or would be) sent to the embedding model: a graph-aware header
+    /// (`embed::context::embed_input`) followed by `content`, truncated to the configured char cap.
+    /// Kept distinct from `content` deliberately — `content` stays the honest source slice, while a
+    /// consumer debugging a bad retrieval hit needs to see what the model actually saw, which is not
+    /// the same text once truncation or a context header is involved.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embed_input: Option<String>,
 }
 
 /// Chunk one file's `source`. Parses with tree-sitter when a grammar exists and the result is
@@ -135,6 +149,8 @@ fn collect_items(
                     start_line,
                     end_line,
                     content: content.to_string(),
+                    embedding: None,
+                    embed_input: None,
                 });
                 // Also recurse so methods inside a small impl / class are independently indexed.
                 collect_items(&child, bytes, file_path, source, language, tuning, out);
@@ -154,6 +170,8 @@ fn collect_items(
                         start_line,
                         end_line,
                         content: content.to_string(),
+                        embedding: None,
+                        embed_input: None,
                     });
                 }
             }
@@ -237,6 +255,8 @@ fn window_chunks(file_path: &str, source: &str, language: &str, tuning: IndexTun
             start_line: start as i32,
             end_line: (end - 1) as i32,
             content,
+            embedding: None,
+            embed_input: None,
         });
         if end == lines.len() {
             break;

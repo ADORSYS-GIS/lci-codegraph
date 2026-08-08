@@ -9,7 +9,12 @@
 //! [`Graph`] of payload-compatible nodes/edges — a filesystem checkout is one *source* of such inputs,
 //! not the only one. The **host** maps the output onto the internal-API payloads
 //! (`agent-clients::ChunkPayload` / `GraphNodePayload` / `GraphEdgePayload`) and submits them, exactly
-//! as `index_checkout` does today — the crate holds no `kube`/`sqlx`/forge dependencies (ADR-0083).
+//! as `index_checkout` does today — the crate holds no `kube`/`sqlx`/forge dependencies (ADR-0083),
+//! with **one** deliberate exception: [`embed`] carries a blocking HTTP client (`ureq`) for an
+//! OpenAI-compatible embeddings endpoint. Embedding-prep (the graph-aware context header) is itself
+//! part of what this crate delivers, and that logic has no reason to exist twice — once here to build
+//! the input, once again in every host to actually send it — so the one HTTP call needed to use what
+//! it built lives here too, opted into per-walk rather than always-on.
 //!
 //! ## What this crate delivers
 //! - [`input`] — the source-agnostic indexing core: [`Indexer`] over raw `(path, bytes)`
@@ -19,11 +24,16 @@
 //! - [`pdf`] — bounded PDF text extraction (byte-capped before parse, panic-caught).
 //! - [`graph`] — the structural call/reference graph with **cross-file resolution** for Rust, Python,
 //!   TypeScript/JavaScript (incl. TSX/JSX), and Java.
-//! - [`walk`] — the filesystem reader ([`FsSource`]) plus the one-pass [`walk_checkout`] driver,
-//!   honouring both ignore layers.
+//! - [`embed`] — semantic embeddings against an OpenAI-compatible endpoint, with a graph-aware context
+//!   header built from the resolved [`Graph`]. No local/in-process model, no feature gate: live
+//!   whenever `OPENAI_BASE_URL` (or an explicit [`EmbedConfig`]) says so. Runs over any reader's
+//!   output via [`embed::embed_output`], not just the filesystem walk.
+//! - [`walk`] — the filesystem reader ([`FsSource`]) plus the one-pass [`walk_checkout`] driver
+//!   (+ embeddings, when configured), honouring both ignore layers.
 //! - a parity-harness scaffold (`tests/parity.rs`) that snapshots the graph against a golden.
 
 pub mod chunk;
+pub mod embed;
 pub mod graph;
 pub mod ignore_list;
 pub mod input;
@@ -34,6 +44,7 @@ pub mod tuning;
 pub mod walk;
 
 pub use chunk::{Chunk, chunk_file, chunk_text};
+pub use embed::{EmbedConfig, EmbedStats};
 pub use graph::{Graph, GraphEdge, GraphNode};
 pub use ignore_list::{DEFAULT_IGNORE_GLOBS, IgnoreConfig, IgnoreList};
 pub use input::{
@@ -85,5 +96,19 @@ mod tests {
         indexer.push(RawInput::new("g.rs", b"fn b() {}\n".to_vec()));
         let indexer_out = indexer.finish();
         assert_eq!(indexer_out.chunks.len(), 1);
+
+        // `embed` re-exports: a config with no reachable endpoint, run through the real
+        // `embed::embed_chunks` entry point on an empty chunk slice — proves `EmbedConfig`/
+        // `EmbedStats` resolve through the crate root AND that `WalkOptions::embed` wires to the same
+        // `embed` module the walk itself calls, not two divergent copies.
+        let embed_config: EmbedConfig = EmbedConfig::builder()
+            .base_url("http://127.0.0.1:1")
+            .build();
+        let empty_graph = Graph::default();
+        let mut no_chunks: Vec<Chunk> = Vec::new();
+        let embed_stats: EmbedStats =
+            embed::embed_chunks(&mut no_chunks, &empty_graph, &embed_config, 32).unwrap();
+        assert_eq!(embed_stats.chunks_embedded, 0);
+        assert_eq!(embed_stats.batches, 0);
     }
 }
