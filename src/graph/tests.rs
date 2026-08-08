@@ -712,8 +712,8 @@ fn java_call_to_a_single_impl_interface_method_resolves_to_the_implementation() 
     // and dropped the call as ambiguous. A BARE call is used deliberately (mirroring the Rust
     // twin's `c.describe()`, which also carries no qualifier): it isolates the exact mechanism this
     // PR fixes — one candidate instead of two — from the tags path's separate qualifier heuristic
-    // (see `java_call_through_an_interface_typed_variable_needs_a_qualifier_match`, below, for why
-    // the issue's own `g.greet()` receiver-variable phrasing needs a different fixture).
+    // (see `java_call_through_an_interface_typed_variable_now_resolves_issue_8`, below, for the
+    // issue's own `g.greet()` receiver-variable phrasing, fixed separately by issue #8).
     let greeter = (
         "Greeter.java",
         "interface Greeter {\n    String greet();\n}\n",
@@ -761,21 +761,16 @@ fn java_call_to_a_single_impl_interface_method_resolves_to_the_implementation() 
 }
 
 #[test]
-fn java_call_through_an_interface_typed_variable_needs_a_qualifier_match() {
-    // FINDING, not fixed here (out of scope — "any change to the resolver's ambiguity policy" is
-    // excluded from issue #5): the issue's own literal reproduction, `g.greet()` where
-    // `g: Greeter`, still does NOT resolve after this fix. `resolve::pick`'s single-candidate
-    // branch rejects a candidate whose scope doesn't textually equal the call's qualifier, and
-    // `qualifier_from_callee_node` sets the qualifier to the raw receiver identifier — here `g`,
-    // the PARAMETER name, not `EnglishGreeter`, the implementing type. There is no type inference in
-    // the tags path, so a receiver variable can never textually match the type that defines the
-    // method it calls. This test documents the boundary of this PR's fix, not a regression: it
-    // passed (found nothing) before this change too, for the SAME underlying reason plus the
-    // declaration-vs-target ambiguity this PR removes — dropping from "ambiguous" to "unresolved"
-    // is not a functional improvement for this exact call shape. Calling through the class name
-    // (`EnglishGreeter.greet()`, next test, and the `java-interface-repo` golden fixture) is the
-    // shape that already works, matching this codebase's existing `Widget.build()`-style qualified
-    // calls in `tests/fixtures/java-repo`.
+fn java_call_through_an_interface_typed_variable_now_resolves_issue_8() {
+    // FIXED here (issue #8, this PR): the issue's own literal reproduction, `g.greet()` where
+    // `g: Greeter`, used to produce NO `calls` edge at all — `qualifier_from_callee_node` set the
+    // qualifier to the raw receiver identifier (`g`, the PARAMETER name, never the type
+    // `EnglishGreeter` that defines the method), and `resolve::pick`'s single-candidate branch
+    // rejected the sole real candidate because that qualifier could never textually match its
+    // scope. `g` is a lowercase-initial identifier — a value, not a type — so it now yields NO
+    // qualifier (`callee::receiver_qualifier`), and the call falls through to bare-name
+    // resolution: one call target (the interface declaration is excluded from the candidate set
+    // by the separate issue #5 fix), so it resolves, exactly like a bare `greet()` call would.
     let greeter = (
         "Greeter.java",
         "interface Greeter {\n    String greet();\n}\n",
@@ -789,10 +784,25 @@ fn java_call_through_an_interface_typed_variable_needs_a_qualifier_match() {
         "class Main {\n    void run(Greeter g) {\n        g.greet();\n    }\n}\n",
     );
     let g = graph_of_lang("java", &[greeter, english_greeter, main]);
-    assert!(
-        !g.edges.iter().any(|e| e.relation == "calls"),
-        "documents a known, pre-existing, separate limitation — not asserting desired behaviour; \
-         edges = {:?}",
+    let run = node(&g, "run()");
+    let calls: Vec<_> = g
+        .edges
+        .iter()
+        .filter(|e| e.relation == "calls" && e.source == run.node_id)
+        .collect();
+    assert_eq!(
+        calls.len(),
+        1,
+        "the call must resolve to exactly one target; got {calls:?}"
+    );
+    let target = g
+        .nodes
+        .iter()
+        .find(|n| n.node_id == calls[0].target)
+        .expect("call target must be an emitted node");
+    assert_eq!(
+        target.source_file, "EnglishGreeter.java",
+        "must resolve to the implementation, not the interface declaration; edges = {:?}",
         g.edges
     );
 }

@@ -1,16 +1,76 @@
 {
   "nodes": [
     {
+      "node_id": "Gizmo.java",
+      "label": "Gizmo.java",
+      "source_file": "Gizmo.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Gizmo.java#1:Gizmo",
+      "label": "Gizmo",
+      "source_file": "Gizmo.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Gizmo.java#2:spin",
+      "label": "spin()",
+      "source_file": "Gizmo.java",
+      "start_line": 2
+    },
+    {
+      "node_id": "Lefty.java",
+      "label": "Lefty.java",
+      "source_file": "Lefty.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Lefty.java#1:Lefty",
+      "label": "Lefty",
+      "source_file": "Lefty.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Lefty.java#2:orbit",
+      "label": "orbit()",
+      "source_file": "Lefty.java",
+      "start_line": 2
+    },
+    {
+      "node_id": "Lefty.java#7:Righty",
+      "label": "Righty",
+      "source_file": "Lefty.java",
+      "start_line": 7
+    },
+    {
+      "node_id": "Lefty.java#8:orbit",
+      "label": "orbit()",
+      "source_file": "Lefty.java",
+      "start_line": 8
+    },
+    {
       "node_id": "Main.java",
       "label": "Main.java",
       "source_file": "Main.java",
       "start_line": 1
     },
     {
+      "node_id": "Main.java#17:runViaVariable",
+      "label": "runViaVariable()",
+      "source_file": "Main.java",
+      "start_line": 17
+    },
+    {
       "node_id": "Main.java#1:Main",
       "label": "Main",
       "source_file": "Main.java",
       "start_line": 1
+    },
+    {
+      "node_id": "Main.java#25:runAmbiguousViaVariable",
+      "label": "runAmbiguousViaVariable()",
+      "source_file": "Main.java",
+      "start_line": 25
     },
     {
       "node_id": "Main.java#2:run",
@@ -87,9 +147,54 @@
   ],
   "edges": [
     {
+      "source": "Gizmo.java",
+      "target": "Gizmo.java#1:Gizmo",
+      "relation": "contains"
+    },
+    {
+      "source": "Gizmo.java#1:Gizmo",
+      "target": "Gizmo.java#2:spin",
+      "relation": "method"
+    },
+    {
+      "source": "Lefty.java",
+      "target": "Lefty.java#1:Lefty",
+      "relation": "contains"
+    },
+    {
+      "source": "Lefty.java",
+      "target": "Lefty.java#7:Righty",
+      "relation": "contains"
+    },
+    {
+      "source": "Lefty.java#1:Lefty",
+      "target": "Lefty.java#2:orbit",
+      "relation": "method"
+    },
+    {
+      "source": "Lefty.java#7:Righty",
+      "target": "Lefty.java#8:orbit",
+      "relation": "method"
+    },
+    {
       "source": "Main.java",
       "target": "Main.java#1:Main",
       "relation": "contains"
+    },
+    {
+      "source": "Main.java#17:runViaVariable",
+      "target": "Gizmo.java#2:spin",
+      "relation": "calls"
+    },
+    {
+      "source": "Main.java#1:Main",
+      "target": "Main.java#17:runViaVariable",
+      "relation": "method"
+    },
+    {
+      "source": "Main.java#1:Main",
+      "target": "Main.java#25:runAmbiguousViaVariable",
+      "relation": "method"
     },
     {
       "source": "Main.java#1:Main",
