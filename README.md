@@ -5,10 +5,13 @@
 [![docs.rs](https://img.shields.io/docsrs/lci-codegraph)](https://docs.rs/lci-codegraph)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-`lci-codegraph` walks a source checkout and, from **one** tree-sitter parse per file, produces both
-semantic chunks (ready to embed for search) and a structural call graph with cross-file resolution.
-It is a pure extractor — no database, no network client, no cluster dependency — the caller decides
-where the output goes.
+`lci-codegraph` walks a source checkout and, from **one** tree-sitter parse per file, produces
+semantic chunks and a structural call graph with cross-file resolution. It is a pure extractor — no
+database, no cluster dependency — the caller decides where the graph and (unembedded) chunks go. The
+one deliberate exception: when [semantic embeddings](#semantic-embeddings) are configured, the crate
+itself makes a blocking HTTP call to an OpenAI-compatible `/embeddings` endpoint, because embedding is
+inherently a round-trip to a model — there is no in-process model this crate could run instead. That
+call is off by default and stays off until an operator sets `OPENAI_BASE_URL`.
 
 ## Install
 
@@ -142,6 +145,13 @@ Structured languages get tree-sitter-extracted items (functions, structs, classe
 everything else — or a file too large to parse, or a language with no grammar — falls back to
 fixed-size overlapping line windows.
 
+Two more fields exist for the [semantic embeddings](#semantic-embeddings) step and stay `None` unless
+it runs: `embedding: Option<Vec<f32>>`, the vector returned by the embeddings endpoint, and
+`embed_input: Option<String>`, the exact text that was (or would be) sent for it — the chunk's
+`content` plus a graph-aware header, truncated to the configured cap. Both are
+`#[serde(skip_serializing_if = "Option::is_none")]`, so JSON output is unchanged when embedding is
+off.
+
 ### Graph
 
 A [`Graph`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.Graph.html) is a flat list of
@@ -238,12 +248,17 @@ to the registry; see `docs/architecture.md`.
 ## Configuration
 
 `WalkOptions` ([`bon`](https://docs.rs/bon) builder) configures the filesystem reader (`FsSource` /
-`walk_checkout`). Three of its five fields are **content-level** — they simply pass through to
+`walk_checkout`). Three of its six fields are **content-level** — they simply pass through to
 [`IndexOptions`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.IndexOptions.html) via
 `impl From<&WalkOptions> for IndexOptions`, so a non-filesystem reader configures the identical
-behaviour by building `IndexOptions` directly. The other two are **FS-reader-only**: they decide which
-paths `FsSource` hands over in the first place and have no `IndexOptions` equivalent at all — a reader
-with no filesystem to walk has nothing to plug them into.
+behaviour by building `IndexOptions` directly. Two are **FS-reader-only**: they decide which paths
+`FsSource` hands over in the first place and have no `IndexOptions` equivalent at all — a reader with
+no filesystem to walk has nothing to plug them into. The last, `embed`, is **`walk_checkout`-only** in
+a different sense: it is not a path-filtering decision either, it is a post-processing step
+`walk_checkout` runs after `Indexer::finish` returns (see [Semantic embeddings](#semantic-embeddings)),
+so it has no `IndexOptions` equivalent for the same reason a non-filesystem caller wanting embeddings
+calls [`embed::embed_output`](https://docs.rs/lci-codegraph/latest/lci_codegraph/embed/fn.embed_output.html)
+itself rather than finding an `IndexOptions` field for it.
 
 | Field | Default | Level | Meaning |
 |---|---|---|---|
@@ -252,11 +267,13 @@ with no filesystem to walk has nothing to plug them into.
 | `extract_pdfs` | `true` | content (`IndexOptions::extract_pdfs`) | Extract text from PDFs and chunk it |
 | `respect_gitignore` | `true` | **FS-reader-only** | Honour the repo's own `.gitignore` (and nested/parent ignore files) |
 | `extra_ignore_globs` | `[]` | **FS-reader-only** | Operator-supplied gitignore-syntax globs, layered on top of the built-in defaults |
+| `embed` | `None` | **`walk_checkout`-only** | `Some(EmbedConfig)` embeds every chunk against an OpenAI-compatible endpoint after `Indexer::finish` returns (see [Semantic embeddings](#semantic-embeddings)); `None` dials out to nothing. [`walk_checkout_from_env`](https://docs.rs/lci-codegraph/latest/lci_codegraph/fn.walk_checkout_from_env.html) sets this from `EmbedConfig::from_env()` |
 
 A caller driving the raw-inputs core directly (`index_inputs`/`Indexer`) builds
 [`IndexOptions`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.IndexOptions.html) instead —
-the same `tuning`/`build_graph`/`extract_pdfs` three fields, with the same defaults, and no ignore
-fields at all (path filtering isn't its job; see "Raw inputs: the filesystem is one reader" above).
+the same `tuning`/`build_graph`/`extract_pdfs` three fields, with the same defaults, and no ignore or
+embed fields at all (path filtering isn't its job, and embedding is a driver-level step layered on top
+via `embed::embed_output`; see "Raw inputs: the filesystem is one reader" above).
 
 `IndexTuning` fields, each readable from an environment variable via
 [`IndexTuning::from_env`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.IndexTuning.html)
@@ -336,6 +353,104 @@ font/glyph tables rather than stream inflation, is not pre-flighted. The wall-cl
 only backstop for those, and on timeout the worker thread is *abandoned*, not killed — its memory is
 not reclaimed. A hard per-parse memory ceiling (subprocess + `RLIMIT_AS`) is not implemented here; a
 caller running this over fully untrusted input at scale should isolate the process accordingly.
+
+## Semantic embeddings
+
+Set `OPENAI_BASE_URL` and `walk_checkout` embeds every chunk it produces against an OpenAI-compatible
+`/embeddings` endpoint — no local/in-process model, no Cargo feature gate. Leave it unset and nothing
+changes: no request is ever made, `Chunk::embedding` stays `None` on every chunk, and the walk costs
+exactly what it cost before this existed.
+
+The embed step itself, [`embed::embed_output`](https://docs.rs/lci-codegraph/latest/lci_codegraph/embed/fn.embed_output.html),
+takes an [`IndexOutput`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.IndexOutput.html)
+rather than anything filesystem-specific, so it isn't only for `walk_checkout` — a caller driving
+`index_inputs`/`Indexer` directly (see "Raw inputs: the filesystem is one reader" above) gets the same
+graph-aware embedding by calling it themselves once their own indexing run finishes. `walk_checkout`
+is simply the one caller that does this for you, wired through `WalkOptions::embed`.
+
+`OPENAI_BASE_URL` is **the switch**: [`EmbedConfig::from_env`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.EmbedConfig.html#method.from_env)
+returns `None` when it is unset or blank, and [`walk_checkout_from_env`](https://docs.rs/lci-codegraph/latest/lci_codegraph/fn.walk_checkout_from_env.html)
+wires that straight into `WalkOptions::embed`. The API key is a separate, optional knob —
+`OPENAI_API_KEY` absent (or blank) means an *unauthenticated* endpoint, which is a legitimate
+configuration, not a missing one: a local gateway, vLLM, or Ollama's OpenAI-compatible shim typically
+needs no key at all.
+
+| Env var | Maps to | Default | Meaning |
+|---|---|---|---|
+| `OPENAI_BASE_URL` | `EmbedConfig::base_url` | unset | **The switch.** Unset or blank → nothing is embedded, zero extra requests. Set → the API base, e.g. `https://api.openai.com/v1`; the request URL is `{base_url}/embeddings` |
+| `OPENAI_API_KEY` | `EmbedConfig::api_key` | `None` | Sent as `Authorization: Bearer <key>` only when set. Blank/whitespace-only counts as unset |
+| `OPENAI_EMBEDDING_MODEL` | `EmbedConfig::model` | `text-embedding-3-small` | Falls back to the default when unset |
+| `OPENAI_EMBEDDING_DIMENSIONS` | `EmbedConfig::dimensions` | `None` | Passed through as the request's `dimensions` field only when set (not every server accepts it). Unparseable → `None`, not an error |
+| `OPENAI_EMBEDDING_TIMEOUT_SECS` | `EmbedConfig::timeout` | `30` | Per-request timeout, in seconds. Unparseable or `0` → default |
+| `OPENAI_EMBEDDING_MAX_RETRIES` | `EmbedConfig::max_retries` | `3` | Retries on `429` / `5xx` / transport error, exponential backoff starting at 500ms. Unparseable → default; `0` is legal (no retry) |
+| `OPENAI_EMBEDDING_MAX_INPUT_CHARS` | `EmbedConfig::max_input_chars` | `8000` | Each input is truncated to this many **chars** (not bytes) before being sent. Unparseable or `0` → default |
+
+There is deliberately no `OPENAI_EMBEDDING_BATCH_SIZE`: batch size reuses the **existing**
+`INDEX_EMBED_BATCH_SIZE` / `IndexTuning::embed_batch_size` knob (default 32, see
+[Configuration](#configuration)) rather than adding a second name for the same setting.
+`EmbedConfig::max_context_refs` (default `8`, the max callees and max callers listed in the context
+header, each side capped independently) has no environment variable — set it through the `EmbedConfig`
+builder directly.
+
+### What actually gets embedded
+
+The text sent to the model is **graph-aware**, not just `chunk.content` on its own:
+`embed::embed_chunks` builds a small index over the resolved `Graph` once per walk and prepends a
+deterministic header — enclosing container, callees, callers — ahead of each chunk's own source.
+
+Below is the header produced for `add` in a three-file Rust checkout where `src/math.rs` defines
+`impl Calculator { pub fn add(..) }`, `add` calls `helper`/`log` in `src/util.rs`, and `main` in
+`src/main.rs` calls `add`:
+
+```
+// file: src/math.rs
+// language: rust
+// function: add
+// within: impl
+// calls: helper() [src/util.rs], log() [src/util.rs]
+// called by: main() [src/main.rs]
+
+pub fn add(&self, x: i32) -> i32 {
+        helper(x) + log(x)
+    }
+```
+
+Two things that example is showing honestly rather than prettily. The `within:` line reads `impl`,
+not `impl Calculator` — a Rust `impl` block's graph label is the bare node kind, because the block
+has no name of its own to take (see the `label` rule in `src/graph/emit.rs`), so for Rust the
+`within:` line tells the model *that* a method sits in an impl but not which type's. A `class` in
+Python/TypeScript/Java, which does have a name, renders as `// within: Calculator`. And the content
+keeps the source's original interior indentation while starting flush at `pub` — the chunk is the
+node's exact byte range, not a re-indented copy.
+
+`file:` and `language:` are always present. The third line is `{chunk_type}: {symbol_name}` when the
+chunk has a symbol name, else the bare `{chunk_type}` (a windowed chunk with no symbol renders as
+`// window`). `within:`, `calls:`, and `called by:` are each omitted entirely when there's nothing to
+say — a `window` chunk, a PDF chunk, or any chunk from a walk with `build_graph: false` maps to no
+graph node at all, so its header is just the first three lines. `calls:`/`called by:` entries are
+`label [source_file]`, sorted and deduplicated, capped at `max_context_refs` per side; a truncated list
+gets a trailing marker, e.g. `// calls: aaa() [b.rs], target() [b.rs] (+1 more)`. Every header uses `//`
+regardless of the chunk's actual language — the header is never compiled, only read by the embedding
+model, so a per-language comment token would buy nothing. The whole thing (header + content) is then
+truncated to `max_input_chars` **chars**, preserving the header and cutting `content` first; only a
+header that alone exceeds the cap gets cut itself.
+
+The result lands on the chunk: `Chunk::embed_input` holds the exact text that was sent (or would be,
+once truncation applies), and `Chunk::embedding` holds the vector that came back.
+
+### Caveats
+
+- **A failed embedding call fails the whole walk.** `walk_checkout` returns `Err` rather than an
+  output with some chunks embedded and others not — configured means required here, because a
+  half-embedded index that looks complete is worse than a walk that visibly failed.
+- **No graph, degraded header.** With `embed` configured but `build_graph: false`, every chunk maps to
+  no graph node, so the header is `file:`/`language:`/symbol only — no `within:`, `calls:`, or
+  `called by:` lines. The walk does not force `build_graph` on to compensate — that would silently
+  change the cost profile of a walk a caller configured without it — it logs a `tracing::warn!`
+  instead.
+- **The endpoint sees your source code.** Every chunk's content (up to `max_input_chars`) goes out in
+  the request body to whatever `OPENAI_BASE_URL` points at. Pointing it at a third-party host is a
+  data-egress decision the operator is making, not one this crate can make safe on its behalf.
 
 ## Testing
 

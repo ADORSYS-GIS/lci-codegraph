@@ -212,6 +212,78 @@ After every file's call sites are resolved, `resolve` sorts and dedups both `nod
 stable enough to snapshot as a golden file and stable enough to submit downstream without spurious
 diffs between runs over the same input.
 
+## Where embedding sits
+
+The honest statement is: **after `Indexer::finish()` resolves the graph, outside the indexing core**,
+because `Indexer` is infallible CPU work and embedding is fallible network I/O. Those two things must
+not merge into one struct. `Indexer`/`IndexOptions` (`src/input.rs`) know nothing about the network —
+no `embed` field, nothing embed-shaped inside `push`/`finish` — for the same reason path-filtering
+lives in the reader and not the indexer (see "The reader/indexer seam" above): folding a fallible,
+externally-latent operation into the one piece of this crate that's supposed to be pure, deterministic
+CPU work would mean a slow or down embeddings endpoint can now make *indexing itself* fail, when
+indexing and embedding are genuinely two different concerns with two different failure models.
+
+`embed::embed_output(&mut output: &mut IndexOutput, config, batch_size)` is the seam: it takes
+whatever an `Indexer::finish()` (or `index_inputs`, or a manual `Indexer`) already produced and embeds
+it in place. That signature is deliberate — an `IndexOutput` carries no opinion about which reader
+built it, so `embed_output` is available to **any** reader, not just the filesystem walk: `walk_checkout`
+calls it, but so could a caller driving `index_inputs`/`Indexer` directly over a tarball or a set of DB
+rows. This is exactly the generalisation the reader/indexer split (ADR-0086) exists for — a new reader
+gets embedding for free by calling the same function, rather than reimplementing it.
+
+The text `embed::embed_chunks` (which `embed_output` wraps) sends to the model is prefixed with a
+header built by `embed::context::ContextIndex` — enclosing container, callees, callers — and that
+index is built from `graph.edges`. A `calls` edge only exists once every input's `FileSymbols` has
+been collected and handed to `resolve` (see "Cross-file resolution" above): a caller in `a.rs` calling
+a callee in `b.rs` has no resolved edge, in either direction, until `b.rs` has been indexed too.
+Embedding a file's chunks as soon as that file is chunked — instead of waiting for `Indexer::finish` —
+would mean every cross-file reference in the header is simply absent for whichever input the reader
+happens to hand over first, which is not "sometimes incomplete", it is "wrong for anything that isn't
+a leaf file with no external callers or callees". That is the concrete reason embedding cannot be
+folded into `Indexer::push`, on top of the fallibility argument above.
+
+`walk_checkout`'s embed step, concretely: call `indexer.finish()` as always, then — only when
+`WalkOptions::embed` is `Some` — pass the resulting `IndexOutput` to `embed::embed_output`, which
+builds the `ContextIndex` once over the finished `Graph`, maps each chunk back to the graph node at its
+location (`ContextIndex::map_chunk` — the file plus line, with the one wrinkle that `Chunk::start_line`
+is 0-based and a graph node's is 1-based), and only then batches chunks out to the embeddings endpoint,
+folding the result into `output.stats.chunks_embedded`/`embed_batches`.
+
+```mermaid
+flowchart LR
+    F["Indexer::finish<br/>(infallible CPU work)"] --> H["IndexOutput { chunks, graph, stats }"]
+    H --> I["embed::embed_output<br/>(fallible network I/O, outside the core)"]
+    I --> J["ContextIndex::build<br/>(once per call, O(nodes+edges))"]
+    J --> K["context::embed_input per chunk<br/>(header + content, char-truncated)"]
+    K --> L["client::embed_batch<br/>(batched HTTP POST /embeddings)"]
+    L --> M["Chunk::embedding + Chunk::embed_input set<br/>+ stats.chunks_embedded / embed_batches"]
+```
+
+When `IndexOptions::build_graph` is `false`, `graph::resolve` is never called and `Indexer::finish`
+returns `Graph::default()` — an empty graph with no nodes and no edges. `ContextIndex::build` over that
+still succeeds (there's simply nothing to index), so every chunk maps to no node and every header
+degrades to `file:`/`language:`/symbol only. `embed` being configured does not implicitly flip
+`build_graph` on to get a better header: that would silently change the cost profile — a full parse
+plus a cross-file resolve pass — of a walk the caller configured without it. `walk_checkout` logs a
+`tracing::warn!` once instead and proceeds with the degraded header.
+
+## `Chunk::content` vs `Chunk::embed_input`
+
+A `Chunk`'s `content` is always the raw source slice `collect_items`/`window_chunks` extracted —
+untouched: no header, no truncation, no reformatting. `embed_input` (set by `embed::embed_chunks`,
+`None` on every chunk when embedding is off or hasn't run yet) is a different string: the graph-aware
+header from `context::embed_input` followed by `content`, with the combined result truncated as a
+whole to `EmbedConfig::max_input_chars` **chars** (`truncate_header_and_content` preserves the header
+and truncates `content` first; only a header that alone is at or over the cap gets cut itself).
+
+The two are deliberately kept apart rather than collapsed into one field. `content` is the fact a
+downstream consumer can trust unconditionally — "this is what's on disk at these lines," independent
+of whether embedding ever ran. `embed_input` is the fact a consumer debugging a bad retrieval hit
+needs instead — the exact text the model actually scored, which is not the same string as `content`
+the moment either the context header or truncation applies, and there would be no way to reconstruct
+it after the fact from `content` alone (the header depends on the state of the graph at embed time,
+and truncation is lossy).
+
 ## Adding a language
 
 A language with a real graph extractor is one `LanguageSupport` implementation in

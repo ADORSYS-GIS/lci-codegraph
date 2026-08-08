@@ -128,6 +128,15 @@ pub struct IndexStats {
     /// meaningful filename at all — "nothing got indexed" and "you handed me a path I can't classify"
     /// otherwise look identical from the outside.
     pub files_skipped_unsupported: usize,
+    /// Chunks that received an embedding vector. Stays `0` unless [`crate::embed::embed_output`] runs
+    /// over this run's [`IndexOutput`] — `Indexer` itself never touches this field, since embedding is
+    /// fallible network I/O and deliberately lives outside the indexing core (see
+    /// `docs/architecture.md`, "Where embedding sits").
+    pub chunks_embedded: usize,
+    /// Round-trips made to the embeddings endpoint by [`crate::embed::embed_output`]. Batching is the
+    /// caller-supplied batch size, so a too-small batch shows up here as a suspiciously high count.
+    /// Stays `0` for the same reason as `chunks_embedded`.
+    pub embed_batches: usize,
 }
 
 /// The output of an indexing run: chunks to embed and the resolved structural graph.

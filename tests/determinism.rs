@@ -8,7 +8,9 @@ mod common;
 
 use std::path::{Path, PathBuf};
 
-use lci_codegraph::{IndexOptions, RawInput, WalkOptions, index_inputs, walk_checkout};
+use lci_codegraph::{
+    EmbedConfig, IndexOptions, RawInput, WalkOptions, index_inputs, walk_checkout,
+};
 
 #[test]
 fn same_checkout_walked_twice_is_byte_identical() {
@@ -79,6 +81,46 @@ fn graph_does_not_depend_on_filesystem_iteration_order() {
             && e.target.contains("helper")),
         "the unambiguous helper() call must still resolve; edges = {:?}",
         g1.edges
+    );
+}
+
+#[test]
+fn embed_inputs_are_byte_identical_across_two_walks() {
+    // `embed::context::embed_input` only runs when `embed` is configured, so this needs a live (if
+    // stubbed) endpoint — unlike `same_checkout_walked_twice_is_byte_identical` above, which never
+    // dials out at all. The vectors the stub returns are irrelevant here; only the *text* sent (the
+    // graph-aware context header + content) is under test.
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    common::write(root, "src/a.rs", "fn caller() { target(); }\n");
+    common::write(root, "src/b.rs", "fn target() {}\n");
+
+    let server = common::EmbedStubServer::start(3, 8);
+    let options = WalkOptions::builder()
+        .build_graph(true)
+        .embed(EmbedConfig::builder().base_url(server.base_url()).build())
+        .build();
+
+    let out1 = walk_checkout(root, &options).unwrap();
+    let out2 = walk_checkout(root, &options).unwrap();
+
+    let inputs1: Vec<Option<&str>> = out1
+        .chunks
+        .iter()
+        .map(|c| c.embed_input.as_deref())
+        .collect();
+    let inputs2: Vec<Option<&str>> = out2
+        .chunks
+        .iter()
+        .map(|c| c.embed_input.as_deref())
+        .collect();
+    assert!(
+        inputs1.iter().all(Option::is_some),
+        "every chunk must carry an embed_input once embed is configured"
+    );
+    assert_eq!(
+        inputs1, inputs2,
+        "embed_input must be byte-identical across repeat walks of the same checkout"
     );
 }
 

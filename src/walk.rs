@@ -20,6 +20,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ignore::WalkBuilder;
 
+use crate::embed::{self, EmbedConfig};
 use crate::ignore_list::{IgnoreConfig, IgnoreList};
 use crate::input::{IndexOptions, IndexOutput, Indexer, MAX_INPUT_BYTES, RawInput};
 use crate::tuning::IndexTuning;
@@ -44,11 +45,21 @@ pub struct WalkOptions {
     /// Operator-configurable extra ignore globs, layered on top of the built-in defaults.
     #[builder(default)]
     pub extra_ignore_globs: Vec<String>,
+    /// When `Some`, embed every chunk against an OpenAI-compatible endpoint after `walk_checkout`
+    /// calls `Indexer::finish` (`embed::embed_output`). `None` (the default — `Option<T>` fields are
+    /// optional-by-default under `bon`, so no `#[builder]` attribute is needed here) keeps the walk
+    /// exactly as behavior-neutral as it was before embedding existed — nothing dials out unless a
+    /// caller opts in, either directly or via [`walk_checkout_from_env`]'s `EmbedConfig::from_env`.
+    pub embed: Option<EmbedConfig>,
 }
 
 /// The FS-reader-specific fields (`respect_gitignore`, `extra_ignore_globs`) have no equivalent in
 /// [`IndexOptions`] — they govern which paths `FsSource` hands over, not how content is indexed once
-/// handed over — so this conversion only carries the three fields both structs share.
+/// handed over. `embed` is left out for the same shape of reason but a different one: it is not a
+/// content-level indexing decision at all, it's a `walk_checkout`-only post-processing step that runs
+/// *after* `Indexer::finish` returns, so `IndexOptions` — which only ever configures `Indexer` itself —
+/// has nothing to plug it into either. This conversion therefore carries only the three fields the two
+/// structs genuinely share.
 impl From<&WalkOptions> for IndexOptions {
     fn from(options: &WalkOptions) -> Self {
         IndexOptions::builder()
@@ -157,8 +168,11 @@ impl Iterator for FsSource {
     }
 }
 
-/// Walk `root`, producing chunks + (optionally) the structural graph. Synchronous CPU work — callers
-/// on an async runtime should wrap this in `spawn_blocking` (as `agent-runner` does).
+/// Walk `root`, producing chunks + (optionally) the structural graph + (optionally) embeddings.
+/// Synchronous CPU work — callers on an async runtime should wrap this in `spawn_blocking` (as
+/// `agent-runner` does). The one exception to "CPU work" is the embed step below, which is
+/// synchronous, fallible network I/O — that's exactly why it runs here, after `Indexer::finish`, and
+/// not inside `Indexer` itself (see `docs/architecture.md`, "Where embedding sits").
 pub fn walk_checkout(root: &Path, options: &WalkOptions) -> anyhow::Result<IndexOutput> {
     let mut source = FsSource::new(root, options)?;
     let mut indexer = Indexer::new(IndexOptions::from(options));
@@ -166,7 +180,21 @@ pub fn walk_checkout(root: &Path, options: &WalkOptions) -> anyhow::Result<Index
         indexer.push(input);
     }
     indexer.record_pruned(source.paths_ignored());
-    Ok(indexer.finish())
+    let mut output = indexer.finish();
+
+    if let Some(embed_config) = &options.embed {
+        if !options.build_graph {
+            // Not forced on: flipping `build_graph` behind a caller's back would silently change the
+            // cost profile (a full parse + resolve pass) of a walk they configured without it.
+            tracing::warn!(
+                "codegraph: embed configured without build_graph — context headers degrade to \
+                 file/language/symbol only, with no within/calls/called-by lines"
+            );
+        }
+        embed::embed_output(&mut output, embed_config, options.tuning.embed_batch_size)?;
+    }
+
+    Ok(output)
 }
 
 /// Convenience: walk reading tuning + operator ignore globs from the environment
@@ -176,6 +204,7 @@ pub fn walk_checkout_from_env(root: &Path, build_graph: bool) -> anyhow::Result<
         .tuning(IndexTuning::from_env())
         .build_graph(build_graph)
         .extra_ignore_globs(read_env_globs())
+        .maybe_embed(EmbedConfig::from_env())
         .build();
     walk_checkout(root, &options)
 }

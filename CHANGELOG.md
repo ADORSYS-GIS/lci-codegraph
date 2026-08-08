@@ -20,24 +20,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `IndexStats::files_skipped_too_large` and `IndexStats::files_skipped_unsupported` counters, so a
   too-large input and an input with no determinable language are each individually diagnosable instead
   of both looking like "nothing got indexed."
+- Semantic embeddings against an OpenAI-compatible `/embeddings` endpoint (`src/embed/`), enabled by
+  `OPENAI_BASE_URL` (`EmbedConfig::from_env`) or a caller-supplied `WalkOptions::embed`. No local/
+  in-process model and no Cargo feature gate — embedding is the live path whenever configured, not a
+  dormant one. The embedded text is graph-aware: a small deterministic header (enclosing container,
+  callees, callers) derived from the resolved `Graph` is prepended to each chunk's own content before
+  it's sent. `embed::embed_output` runs the step over any `IndexOutput` — not just `walk_checkout`'s —
+  after the graph is resolved, since the header needs cross-file callers/callees that don't exist until
+  every input has been indexed (see `docs/architecture.md`).
+- `IndexStats::chunks_embedded` and `IndexStats::embed_batches` counters, logged at the end of a run
+  that embeds.
+- `Chunk::embedding: Option<Vec<f32>>` and `Chunk::embed_input: Option<String>` (both
+  `#[serde(skip_serializing_if = "Option::is_none")]`, so existing JSON output is unchanged when
+  embedding is off).
 
 ### Changed
 
 - `src/walk.rs` is now a thin filesystem-reader driver: `walk_checkout` builds an `FsSource`, pushes
-  every input it yields into an `Indexer`, records the pruned count, and calls `finish` — the one-parse
-  chunk/graph logic itself now lives in `Indexer::push`, not in `walk.rs`.
+  every input it yields into an `Indexer`, records the pruned count, calls `finish`, and — when
+  `WalkOptions::embed` is set — calls `embed::embed_output` on the result. The one-parse chunk/graph
+  logic itself now lives in `Indexer::push`, not in `walk.rs`; embedding never did and still doesn't,
+  because it's fallible network I/O and the indexing core is infallible CPU work.
 - `IndexStats::files_skipped_binary` now also covers content that fails UTF-8 decoding outright;
   previously that path incremented no counter at all.
 - The operator/gitignore path-filtering layer now lives entirely in the reader (`FsSource`), not in the
   indexing core — deciding which inputs are worth handing over is the reader's job, because only the
   reader can avoid paying to produce an input that would just be discarded.
+- **Breaking:** `Chunk` no longer derives `Eq` (only `PartialEq`) — a chunk carrying an
+  `embedding: Vec<f32>` has no total equality, since floats aren't `Eq`. Downstream code relying on
+  `Chunk: Eq` (a `HashSet<Chunk>`/`BTreeSet<Chunk>`, an `Ord`/`dedup` bound requiring it, etc.) will
+  fail to compile. Verified none of that exists in this crate's own `src/`, `tests/`, or `examples/`.
+- **Breaking:** `Chunk` gained the two fields above. Any downstream construction site using an
+  exhaustive `Chunk { .. }` struct literal (rather than `..Default::default()` or a builder) will fail
+  to compile until it sets `embedding` and `embed_input` too.
+- The crate's dependency boundary is revised: `ureq` is now a dependency, used **solely** for the
+  optional embeddings HTTP call — the one part of this crate's job that is inherently a network
+  round-trip to a model endpoint. Every other part of the boundary (no `kube`/`sqlx`/forge client) is
+  unchanged.
 
 ### BREAKING
 
 - `WalkOutput` and `WalkStats` are renamed to `IndexOutput` and `IndexStats`. Migration: replace
   `WalkOutput`/`WalkStats` with `IndexOutput`/`IndexStats` wherever they're named (the field shapes are
-  unchanged, plus the two new counters above) — `walk_checkout`/`walk_checkout_from_env`'s signatures
-  are otherwise unchanged.
+  unchanged, plus the new counters above) — `walk_checkout`/`walk_checkout_from_env`'s signatures are
+  otherwise unchanged.
 
 ## [0.1.0] - 2026-08-07
 
