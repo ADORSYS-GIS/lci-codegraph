@@ -154,8 +154,16 @@ jobs:
       # a green gate is necessary but not sufficient for `lci-codegraph-spring` and `lci-codegraph`
       # — their first real publish (see `publish` job below) is the actual proof for those two, not
       # this step.
-      - name: cargo publish --dry-run (lci-codegraph-model only — see comment above)
-        run: cargo publish -p lci-codegraph-model --dry-run --locked
+      # Gates the real publish below against a manifest problem that only surfaces at package
+      # time. `--workspace` packages all three crates and resolves their internal dependencies
+      # locally, the same way the real publish does — a plain root-only dry-run cannot work at all
+      # here, since `lci-codegraph`'s path+version dependencies are not on the registry.
+      #
+      # Still necessary-but-not-sufficient: a dry run skips the upload, so it cannot see the
+      # registry-side "version already published" or "name taken" checks. A green gate does not
+      # prove the real publish will succeed.
+      - name: cargo publish --dry-run
+        run: cargo publish --workspace --dry-run --locked
 
   publish:
     name: cargo publish
@@ -174,26 +182,20 @@ jobs:
         with:
           workspaces: "."
 
-      # Explicit sequential steps, not `cargo publish --workspace` — dependency order is the whole
-      # point here (`lci-codegraph-spring` depends on `lci-codegraph-model`; `lci-codegraph` depends
-      # on both), and writing it as three named steps keeps that order visible in the job log rather
-      # than hidden inside whatever order `--workspace` happens to choose. Modern cargo blocks each
-      # `publish` call until the crate is visible in the index before returning, so there is no need
-      # for a manual sleep/poll between these three steps.
-      - name: cargo publish -p lci-codegraph-model
+      # One `--workspace` publish, deliberately the SAME command the dry-run gate above runs.
+      # Cargo publishes the three crates in dependency order itself (`lci-codegraph-spring` needs
+      # `lci-codegraph-model`; `lci-codegraph` needs both) and blocks until each is visible in the
+      # index before starting the next, so no manual ordering or sleep/poll is needed.
+      #
+      # This was three explicit `cargo publish -p <name>` steps for log readability, which was the
+      # wrong trade: the gate can only run as `--workspace` (a root-only dry-run cannot resolve the
+      # unpublished internal dependencies at all), and a gate that exercises a different code path
+      # from the thing it gates is not really a gate. Keeping both on `--workspace` means a green
+      # dry-run is evidence about this exact command.
+      - name: cargo publish --workspace
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish -p lci-codegraph-model --locked
-
-      - name: cargo publish -p lci-codegraph-spring
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish -p lci-codegraph-spring --locked
-
-      - name: cargo publish -p lci-codegraph
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish -p lci-codegraph --locked
+        run: cargo publish --workspace --locked
 
   github-release:
     name: create GitHub release
