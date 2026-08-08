@@ -715,8 +715,8 @@ fn java_call_to_a_single_impl_interface_method_resolves_to_the_implementation() 
     // and dropped the call as ambiguous. A BARE call is used deliberately (mirroring the Rust
     // twin's `c.describe()`, which also carries no qualifier): it isolates the exact mechanism this
     // PR fixes — one candidate instead of two — from the tags path's separate qualifier heuristic
-    // (see `java_call_through_an_interface_typed_variable_needs_a_qualifier_match`, below, for why
-    // the issue's own `g.greet()` receiver-variable phrasing needs a different fixture).
+    // (see `java_call_through_an_interface_typed_variable_now_resolves_issue_8`, below, for the
+    // issue's own `g.greet()` receiver-variable phrasing, fixed separately by issue #8).
     let greeter = (
         "Greeter.java",
         "interface Greeter {\n    String greet();\n}\n",
@@ -764,16 +764,21 @@ fn java_call_to_a_single_impl_interface_method_resolves_to_the_implementation() 
 }
 
 #[test]
-fn java_call_through_an_interface_typed_parameter_now_resolves_via_declared_type_qualifier() {
-    // FORMERLY a documented, out-of-scope limitation (issue #5's own boundary note): `g.greet()`
-    // where `g: Greeter` used to NOT resolve, because `qualifier_from_callee_node` set the
-    // qualifier to the raw receiver identifier `g` — the PARAMETER name, not `EnglishGreeter`, the
-    // implementing type — and `resolve::pick` rejected the mismatch. Phase 0
-    // (docs/design/spring-aware-graph.md §4.2, item 2) is exactly this fix:
-    // `callee::declared_type_of` recovers `g`'s declared type (`Greeter`, from its
-    // `formal_parameter`), and `callee::supertype_names` + `resolve::pick`'s supers-aware matching
-    // let that qualifier match `EnglishGreeter` (which `implements Greeter`) instead of reading as
-    // a contradiction. This is the parameter-typed twin of the field-injected case below.
+fn java_call_through_an_interface_typed_parameter_resolves_to_the_implementation_issue_8() {
+    // Issue #8's own literal reproduction, and formerly a documented out-of-scope limitation of
+    // issue #5. `g.greet()` where `g: Greeter` used to produce NO `calls` edge: the qualifier was
+    // the raw receiver identifier `g` — the PARAMETER name, never `EnglishGreeter`, the type that
+    // defines the method — and `resolve::pick`'s single-candidate branch rejected the sole real
+    // candidate on a qualifier that could never textually match its scope.
+    //
+    // Two independent fixes both apply here, and it is worth being precise about which one does
+    // the work, because they are not interchangeable (see `callee::receiver_qualifier`'s tiers):
+    // tier 1 fires, recovering `g`'s DECLARED TYPE `Greeter` from its `formal_parameter`, and
+    // `resolve::pick`'s supers-aware matching accepts `EnglishGreeter` because it
+    // `implements Greeter`. Issue #8's lowercase-receiver rule (tier 3) would also make this
+    // resolve — but only because there happens to be exactly one candidate. Tier 1 is what keeps
+    // it resolving when there are several; see
+    // `java_two_same_named_methods_are_told_apart_by_the_receivers_declared_type`.
     let greeter = (
         "Greeter.java",
         "interface Greeter {\n    String greet();\n}\n",
@@ -787,10 +792,25 @@ fn java_call_through_an_interface_typed_parameter_now_resolves_via_declared_type
         "class Main {\n    void run(Greeter g) {\n        g.greet();\n    }\n}\n",
     );
     let g = graph_of_lang("java", &[greeter, english_greeter, main]);
-    assert!(
-        has_call(&g, "run()", "greet()"),
-        "g.greet() must now resolve to EnglishGreeter.greet via the recovered declared-type \
-         qualifier; edges = {:?}",
+    let run = node(&g, "run()");
+    let calls: Vec<_> = g
+        .edges
+        .iter()
+        .filter(|e| e.relation == "calls" && e.source == run.node_id)
+        .collect();
+    assert_eq!(
+        calls.len(),
+        1,
+        "the call must resolve to exactly one target; got {calls:?}"
+    );
+    let target = g
+        .nodes
+        .iter()
+        .find(|n| n.node_id == calls[0].target)
+        .expect("call target must be an emitted node");
+    assert_eq!(
+        target.source_file, "EnglishGreeter.java",
+        "must resolve to the implementation, not the interface declaration; edges = {:?}",
         g.edges
     );
 }
@@ -920,11 +940,19 @@ fn java_declared_type_that_contradicts_the_only_candidate_still_yields_no_edge()
 }
 
 #[test]
-fn java_call_through_an_unknown_receiver_falls_back_to_bare_identifier_behaviour() {
-    // No local/field/parameter named `obj` is declared anywhere in scope — `declared_type_of`
-    // finds nothing, so the qualifier falls back to the bare identifier text `"obj"`, exactly the
-    // pre-Phase-0 behaviour. `"obj"` doesn't match `Widget`, the only candidate's scope, so this
-    // must still NOT resolve — the fallback must not silently become more lenient.
+fn java_call_through_an_undeclared_receiver_resolves_on_the_bare_name() {
+    // No local/field/parameter named `obj` is declared anywhere in scope, so `declared_type_of`
+    // finds nothing and `obj` is lowercase — the qualifier is dropped entirely (issue #8), and the
+    // call resolves on the bare name against the single candidate, exactly as a bare `build()`
+    // would.
+    //
+    // This case CHANGED when issue #8's fix merged with the declared-type recovery. Previously the
+    // qualifier fell back to the bare receiver text `"obj"`, which could never match `Widget` and
+    // so produced no edge. Issue #8 argues that is the wrong trade — a never-matching qualifier
+    // manufactures a false negative for the single most common call shape in idiomatic Java, and a
+    // bare call already resolves to a lone same-named candidate with zero type checking, so this
+    // adds no NEW mis-attribution risk. The negative twin below is what keeps it honest: several
+    // candidates and no qualifier is still dropped as ambiguous, never guessed.
     let widget = ("Widget.java", "class Widget { void build() {} }\n");
     let runner = (
         "Runner.java",
@@ -932,9 +960,27 @@ fn java_call_through_an_unknown_receiver_falls_back_to_bare_identifier_behaviour
     );
     let g = graph_of_lang("java", &[widget, runner]);
     assert!(
+        has_call(&g, "go()", "build()"),
+        "an undeclared receiver drops its qualifier and resolves on the bare name; edges = {:?}",
+        g.edges
+    );
+}
+
+#[test]
+fn java_undeclared_receiver_with_several_same_named_candidates_stays_ambiguous() {
+    // The negative twin of the test above, and the reason dropping the qualifier is safe: with no
+    // declared type to narrow on and two same-named candidates, the precision-favouring policy
+    // still drops the call rather than guessing one.
+    let widget = ("Widget.java", "class Widget { void build() {} }\n");
+    let gadget = ("Gadget.java", "class Gadget { void build() {} }\n");
+    let runner = (
+        "Runner.java",
+        "class Runner {\n    void go() {\n        obj.build();\n    }\n}\n",
+    );
+    let g = graph_of_lang("java", &[widget, gadget, runner]);
+    assert!(
         !g.edges.iter().any(|e| e.relation == "calls"),
-        "an undeclared receiver must fall back to the bare identifier, which doesn't match \
-         Widget; edges = {:?}",
+        "two same-named candidates with no qualifier must stay ambiguous; edges = {:?}",
         g.edges
     );
 }

@@ -118,9 +118,11 @@ fn type_head_name(node: &Node<'_>, bytes: &[u8]) -> Option<String> {
 }
 
 /// The qualifier for a tags-captured callee name node: its receiver, when the name is the property of
-/// a member access (`Foo.bar()` → `Foo`; Python `obj.m()` / Java `Obj.m()`). A bare call
-/// (`function`-field identifier) or a `self`/`this`/`cls`/`super` receiver yields no qualifier — the
-/// call resolves on the bare name (single hit) or is dropped as ambiguous, never mis-attributed.
+/// a member access AND the receiver is plausibly a type (`Foo.bar()` → `Foo`; Java `Obj.m()`). A bare
+/// call (`function`-field identifier), a `self`/`this`/`cls`/`super` receiver, or a **value** receiver
+/// (a lowercase-initial variable/module, e.g. `obj` in `obj.foo()` — see [`receiver_qualifier`])
+/// yields no qualifier — the call resolves on the bare name (single hit) or is dropped as ambiguous,
+/// never mis-attributed.
 pub(super) fn qualifier_from_callee_node(name_node: &Node<'_>, bytes: &[u8]) -> Option<String> {
     let parent = name_node.parent()?;
     match parent.kind() {
@@ -137,14 +139,51 @@ pub(super) fn qualifier_from_callee_node(name_node: &Node<'_>, bytes: &[u8]) -> 
 /// they yield no qualifier — the call resolves on the bare method name (single hit) or is dropped as
 /// ambiguous, never mis-attributed by a bogus `self` qualifier.
 ///
-/// For every other receiver, Phase 0 (docs/design/spring-aware-graph.md §4.2) tries to recover the
-/// receiver's **declared type** ([`declared_type_of`]) before falling back to the bare identifier text.
-/// This is the fix for the crate's single biggest Java resolution gap: `accountService.findById(id)`'s
-/// qualifier used to be `"accountService"`, the variable name — which `resolve::pick` then compared
-/// against a candidate's `scope` (a *type* name, `"AccountServiceImpl"`) and rejected as a mismatch,
-/// even though the call was completely unambiguous. Recovering the declared type turns the qualifier
-/// into `"AccountService"`, which `pick` can now match either directly or, via [`supertype_names`],
-/// through the implementing/extending type's own `extends`/`implements` clause.
+/// Every other receiver goes through three tiers, most informative first. Issue #8 and
+/// docs/design/spring-aware-graph.md §4.2 diagnosed the same defect and fixed it at different
+/// depths; both fixes are kept, because they are not redundant — the first can *narrow* a
+/// multi-candidate set, and the second and third cannot.
+///
+/// **1. The receiver's declared type ([`declared_type_of`]), Java only.** `accountService.findById()`
+/// used to record the qualifier `"accountService"` — the variable name — which
+/// [`super::resolve::pick`] compared against a candidate's `scope` (a *type* name,
+/// `"AccountServiceImpl"`) and rejected as a mismatch, even though the call was completely
+/// unambiguous. Recovering the declared type makes the qualifier `"AccountService"`, which `pick`
+/// matches directly or, via [`supertype_names`], through the implementing type's own
+/// `extends`/`implements` clause.
+///
+/// This tier is what tiers 2 and 3 cannot do: it supplies a real type name, so it still resolves when
+/// there are **several** same-named candidates. `AccountServiceImpl.findByEmail` and
+/// `AccountRepository.findByEmail` are told apart only by their receivers' declared types; under
+/// tier 3 alone both calls would see two candidates, no qualifier, and be dropped as ambiguous.
+///
+/// **2. A capitalised receiver (`Foo.bar()`).** No declaration found, but the Java/TypeScript/Python
+/// naming convention says a capitalised identifier plausibly names a type. This is the pre-existing
+/// static-call behaviour and the only tier available to the non-Java tags languages.
+///
+/// **3. Otherwise, no qualifier at all.** The mechanism below, from issue #8:
+///
+/// The same is true, and for the same reason, of a **value** receiver — a local variable holding an
+/// instance (`a` in `a.helper()`) or a module (`math` in `math.sqrt()`). This extractor has no type
+/// inference: it cannot tell what `a` was assigned, so a qualifier built from `a`'s own text would
+/// almost never equal the callable's declaring-type `scope` (`A`) and [`super::resolve::pick`]'s
+/// single-candidate branch would reject the one correct candidate — issue #8. We use the Java/
+/// TypeScript/Python naming convention (types/classes are capitalised; variables and modules are not)
+/// as a cheap, no-inference proxy for "is this plausibly a type": a capitalised identifier stays a
+/// qualifier (`Foo.bar()`, and the constant-receiver case `CONFIG.get()`, which reads as a type/
+/// singular-instance qualifier under the same convention and is accepted on the same terms); a
+/// lowercase-initial identifier yields `None` and the call falls through to bare-name resolution,
+/// exactly like `foo()` — single candidate resolves, several candidates with no qualifier are dropped
+/// as ambiguous.
+///
+/// Precision trade-off: dropping the qualifier means `a.run()` could resolve to the single `run`
+/// defined on a class `a` was never actually assigned. This is deliberately no *new* risk — a bare
+/// `run()` call already resolves to a lone same-named candidate with zero type checking, and every
+/// value-receiver call the old code silently discarded is textually indistinguishable from a bare
+/// call once its (never-matching) qualifier is set aside. This makes value-receiver calls behave like
+/// bare calls instead of manufacturing a false negative that dominates real codebases (see issue #8:
+/// this is the single most common call shape in idiomatic Java/TS/Python and was recording zero
+/// `calls` edges for all of it).
 fn receiver_qualifier(object: &Node<'_>, bytes: &[u8]) -> Option<String> {
     if object.kind() != "identifier" {
         return None;
@@ -152,7 +191,13 @@ fn receiver_qualifier(object: &Node<'_>, bytes: &[u8]) -> Option<String> {
     let name = text(object, bytes)?;
     match name.as_str() {
         "self" | "cls" | "this" | "super" => None,
-        _ => Some(declared_type_of(object, &name, bytes).unwrap_or(name)),
+        // Tier 1: the receiver's declared type (Java). Tier 2: a capitalised receiver, which
+        // plausibly names a type. Tier 3: nothing — fall through to bare-name resolution.
+        _ => match declared_type_of(object, &name, bytes) {
+            Some(declared) => Some(declared),
+            None if is_type_like(&name) => Some(name),
+            None => None,
+        },
     }
 }
 
@@ -342,6 +387,14 @@ fn collect_type_head_names(node: &Node<'_>, bytes: &[u8], out: &mut Vec<String>)
     }
 }
 
+/// Java/TypeScript/Python naming convention: a capitalised identifier plausibly names a *type*
+/// (`Foo`, or an all-caps constant like `CONFIG`); a lowercase-initial identifier names a *value* — a
+/// local variable or a module (`a`, `math`) — whose actual type this extractor does not track. See
+/// [`receiver_qualifier`] for how this is used and why.
+fn is_type_like(name: &str) -> bool {
+    name.chars().next().is_some_and(char::is_uppercase)
+}
+
 fn text(node: &Node<'_>, bytes: &[u8]) -> Option<String> {
     std::str::from_utf8(&bytes[node.byte_range()])
         .ok()
@@ -528,27 +581,90 @@ mod tests {
     }
 
     #[test]
-    fn python_attribute_receiver_is_the_qualifier() {
-        with_tagged_node("obj.m()", "python", "attribute", |attr, bytes| {
+    fn python_capitalised_attribute_receiver_is_the_qualifier() {
+        // `Obj.m()` — a capitalised receiver plausibly names a type, so it stays a qualifier.
+        with_tagged_node("Obj.m()", "python", "attribute", |attr, bytes| {
             let name_node = attr.child_by_field_name("attribute").unwrap();
             assert_eq!(
                 qualifier_from_callee_node(&name_node, bytes).as_deref(),
-                Some("obj")
+                Some("Obj")
             );
         });
     }
 
     #[test]
-    fn java_method_invocation_receiver_is_the_qualifier() {
+    fn java_capitalised_method_invocation_receiver_is_the_qualifier() {
+        // `Obj.m()` — a capitalised receiver plausibly names a type, so it stays a qualifier.
         with_tagged_node(
-            "class C { void go() { obj.m(); } }",
+            "class C { void go() { Obj.m(); } }",
             "java",
             "method_invocation",
             |call, bytes| {
                 let name_node = call.child_by_field_name("name").unwrap();
                 assert_eq!(
                     qualifier_from_callee_node(&name_node, bytes).as_deref(),
-                    Some("obj")
+                    Some("Obj")
+                );
+            },
+        );
+    }
+
+    // ── issue #8: a lowercase-initial (value) receiver yields NO qualifier ─────────────────────────
+
+    #[test]
+    fn python_lowercase_attribute_receiver_yields_no_qualifier() {
+        // `obj.m()` — `obj` is a variable, not a type; recording it as a qualifier is exactly issue
+        // #8 (the qualifier can never textually match the callable's declaring-type scope, so the
+        // one correct candidate gets rejected). No qualifier lets the call fall through to bare-name
+        // resolution instead.
+        with_tagged_node("obj.m()", "python", "attribute", |attr, bytes| {
+            let name_node = attr.child_by_field_name("attribute").unwrap();
+            assert_eq!(qualifier_from_callee_node(&name_node, bytes), None);
+        });
+    }
+
+    #[test]
+    fn java_lowercase_method_invocation_receiver_yields_no_qualifier() {
+        // `obj.m()` — same as the Python case above: a value receiver, not a type.
+        with_tagged_node(
+            "class C { void go() { obj.m(); } }",
+            "java",
+            "method_invocation",
+            |call, bytes| {
+                let name_node = call.child_by_field_name("name").unwrap();
+                assert_eq!(qualifier_from_callee_node(&name_node, bytes), None);
+            },
+        );
+    }
+
+    #[test]
+    fn js_lowercase_member_expression_receiver_yields_no_qualifier() {
+        // `a.helper()` — the exact reproduction shape from issue #8.
+        with_tagged_node(
+            "a.helper();",
+            "javascript",
+            "member_expression",
+            |member, bytes| {
+                let name_node = member.child_by_field_name("property").unwrap();
+                assert_eq!(qualifier_from_callee_node(&name_node, bytes), None);
+            },
+        );
+    }
+
+    #[test]
+    fn all_caps_constant_receiver_is_still_treated_as_a_type_qualifier() {
+        // `CONFIG.get()` — an all-caps identifier is capitalised, so it stays a qualifier under the
+        // same convention as `Foo.bar()`. Documented, accepted trade-off: see `receiver_qualifier`'s
+        // doc comment.
+        with_tagged_node(
+            "CONFIG.get();",
+            "javascript",
+            "member_expression",
+            |member, bytes| {
+                let name_node = member.child_by_field_name("property").unwrap();
+                assert_eq!(
+                    qualifier_from_callee_node(&name_node, bytes).as_deref(),
+                    Some("CONFIG")
                 );
             },
         );
@@ -702,24 +818,28 @@ mod tests {
     }
 
     #[test]
-    fn java_qualifier_falls_back_to_the_bare_identifier_for_a_primitive_receiver() {
+    fn java_qualifier_of_a_primitive_receiver_is_dropped_entirely() {
         // Calling `.foo()` on an `int` isn't valid Java, but the grammar parses it structurally
-        // regardless. Since `declared_type_of` refuses to map the primitive `int` to a name (see
-        // the direct test above), the overall qualifier falls back to the bare identifier `"x"` —
-        // exactly the "no usable declaration found" path, not a special primitive case.
+        // regardless. `declared_type_of` refuses to map the primitive `int` to a name (see the
+        // direct test above), so tier 1 finds nothing; `x` is lowercase, so tier 2 declines too;
+        // tier 3 drops the qualifier. This is the "no usable declaration found" path, not a
+        // special primitive case.
         assert_eq!(
-            java_qualifier_of_the_only_call("class C { void go(int x) { x.foo(); } }").as_deref(),
-            Some("x")
+            java_qualifier_of_the_only_call("class C { void go(int x) { x.foo(); } }"),
+            None
         );
     }
 
     #[test]
-    fn java_qualifier_falls_back_to_the_bare_identifier_when_no_declaration_is_found() {
-        // No local/field/parameter named `obj` exists anywhere in scope — falls back to the
-        // pre-Phase-0 behaviour of using the bare receiver text.
+    fn java_qualifier_is_dropped_when_no_declaration_is_found() {
+        // No local/field/parameter named `obj` exists anywhere in scope, so tier 1 finds nothing
+        // and `obj` is lowercase, so tier 2 declines. The qualifier is DROPPED rather than set to
+        // the bare receiver text (issue #8): a variable name is not a type name, and keeping it
+        // could only ever contradict a candidate's scope and reject a correct answer. The call
+        // then resolves on the bare name, exactly like `m()` would.
         assert_eq!(
-            java_qualifier_of_the_only_call("class C { void go() { obj.m(); } }").as_deref(),
-            Some("obj")
+            java_qualifier_of_the_only_call("class C { void go() { obj.m(); } }"),
+            None
         );
     }
 
@@ -749,14 +869,13 @@ mod tests {
     #[test]
     fn java_qualifier_does_not_recover_a_multi_catch_declared_type() {
         // `catch (IOException | SQLException e)` has no SINGLE declared type — must not guess one
-        // of the alternatives, falls back to the bare identifier.
+        // of the alternatives. With no type recovered and `e` lowercase, the qualifier is dropped.
         assert_eq!(
             java_qualifier_of_the_only_call(
                 "class C { void go() { \
                  try {} catch (IOException | SQLException e) { e.printStackTrace(); } } }"
-            )
-            .as_deref(),
-            Some("e")
+            ),
+            None
         );
     }
 

@@ -1,10 +1,64 @@
 {
   "nodes": [
     {
+      "node_id": "Gizmo.java",
+      "label": "Gizmo.java",
+      "source_file": "Gizmo.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Gizmo.java#1:Gizmo",
+      "label": "Gizmo",
+      "source_file": "Gizmo.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Gizmo.java#2:spin",
+      "label": "spin()",
+      "source_file": "Gizmo.java",
+      "start_line": 2
+    },
+    {
+      "node_id": "Lefty.java",
+      "label": "Lefty.java",
+      "source_file": "Lefty.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Lefty.java#1:Lefty",
+      "label": "Lefty",
+      "source_file": "Lefty.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Lefty.java#2:orbit",
+      "label": "orbit()",
+      "source_file": "Lefty.java",
+      "start_line": 2
+    },
+    {
+      "node_id": "Lefty.java#7:Righty",
+      "label": "Righty",
+      "source_file": "Lefty.java",
+      "start_line": 7
+    },
+    {
+      "node_id": "Lefty.java#8:orbit",
+      "label": "orbit()",
+      "source_file": "Lefty.java",
+      "start_line": 8
+    },
+    {
       "node_id": "Main.java",
       "label": "Main.java",
       "source_file": "Main.java",
       "start_line": 1
+    },
+    {
+      "node_id": "Main.java#17:runViaVariable",
+      "label": "runViaVariable()",
+      "source_file": "Main.java",
+      "start_line": 17
     },
     {
       "node_id": "Main.java#1:Main",
@@ -13,16 +67,46 @@
       "start_line": 1
     },
     {
+      "node_id": "Main.java#27:runDisambiguatedByDeclaredType",
+      "label": "runDisambiguatedByDeclaredType()",
+      "source_file": "Main.java",
+      "start_line": 27
+    },
+    {
       "node_id": "Main.java#2:run",
       "label": "run()",
       "source_file": "Main.java",
       "start_line": 2
     },
     {
+      "node_id": "Main.java#36:runAmbiguousViaInterface",
+      "label": "runAmbiguousViaInterface()",
+      "source_file": "Main.java",
+      "start_line": 36
+    },
+    {
       "node_id": "Main.java#7:runBare",
       "label": "runBare()",
       "source_file": "Main.java",
       "start_line": 7
+    },
+    {
+      "node_id": "Orbiter.java",
+      "label": "Orbiter.java",
+      "source_file": "Orbiter.java",
+      "start_line": 1
+    },
+    {
+      "node_id": "Orbiter.java#11:Orbiter",
+      "label": "Orbiter",
+      "source_file": "Orbiter.java",
+      "start_line": 11
+    },
+    {
+      "node_id": "Orbiter.java#12:orbit",
+      "label": "orbit()",
+      "source_file": "Orbiter.java",
+      "start_line": 12
     },
     {
       "node_id": "Util.java",
@@ -87,9 +171,54 @@
   ],
   "edges": [
     {
+      "source": "Gizmo.java",
+      "target": "Gizmo.java#1:Gizmo",
+      "relation": "contains"
+    },
+    {
+      "source": "Gizmo.java#1:Gizmo",
+      "target": "Gizmo.java#2:spin",
+      "relation": "method"
+    },
+    {
+      "source": "Lefty.java",
+      "target": "Lefty.java#1:Lefty",
+      "relation": "contains"
+    },
+    {
+      "source": "Lefty.java",
+      "target": "Lefty.java#7:Righty",
+      "relation": "contains"
+    },
+    {
+      "source": "Lefty.java#1:Lefty",
+      "target": "Lefty.java#2:orbit",
+      "relation": "method"
+    },
+    {
+      "source": "Lefty.java#7:Righty",
+      "target": "Lefty.java#8:orbit",
+      "relation": "method"
+    },
+    {
       "source": "Main.java",
       "target": "Main.java#1:Main",
       "relation": "contains"
+    },
+    {
+      "source": "Main.java#17:runViaVariable",
+      "target": "Gizmo.java#2:spin",
+      "relation": "calls"
+    },
+    {
+      "source": "Main.java#1:Main",
+      "target": "Main.java#17:runViaVariable",
+      "relation": "method"
+    },
+    {
+      "source": "Main.java#1:Main",
+      "target": "Main.java#27:runDisambiguatedByDeclaredType",
+      "relation": "method"
     },
     {
       "source": "Main.java#1:Main",
@@ -98,8 +227,18 @@
     },
     {
       "source": "Main.java#1:Main",
+      "target": "Main.java#36:runAmbiguousViaInterface",
+      "relation": "method"
+    },
+    {
+      "source": "Main.java#1:Main",
       "target": "Main.java#7:runBare",
       "relation": "method"
+    },
+    {
+      "source": "Main.java#27:runDisambiguatedByDeclaredType",
+      "target": "Lefty.java#2:orbit",
+      "relation": "calls"
     },
     {
       "source": "Main.java#2:run",
@@ -110,6 +249,16 @@
       "source": "Main.java#2:run",
       "target": "Widget.java#2:build",
       "relation": "calls"
+    },
+    {
+      "source": "Orbiter.java",
+      "target": "Orbiter.java#11:Orbiter",
+      "relation": "contains"
+    },
+    {
+      "source": "Orbiter.java#11:Orbiter",
+      "target": "Orbiter.java#12:orbit",
+      "relation": "method"
     },
     {
       "source": "Util.java",

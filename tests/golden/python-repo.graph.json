@@ -1,22 +1,82 @@
 {
   "nodes": [
     {
+      "node_id": "app/gizmo.py",
+      "label": "gizmo.py",
+      "source_file": "app/gizmo.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "app/gizmo.py#1:Gizmo",
+      "label": "Gizmo",
+      "source_file": "app/gizmo.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "app/gizmo.py#2:spin",
+      "label": "spin()",
+      "source_file": "app/gizmo.py",
+      "start_line": 2
+    },
+    {
+      "node_id": "app/lefty.py",
+      "label": "lefty.py",
+      "source_file": "app/lefty.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "app/lefty.py#1:Lefty",
+      "label": "Lefty",
+      "source_file": "app/lefty.py",
+      "start_line": 1
+    },
+    {
+      "node_id": "app/lefty.py#2:orbit",
+      "label": "orbit()",
+      "source_file": "app/lefty.py",
+      "start_line": 2
+    },
+    {
+      "node_id": "app/lefty.py#6:Righty",
+      "label": "Righty",
+      "source_file": "app/lefty.py",
+      "start_line": 6
+    },
+    {
+      "node_id": "app/lefty.py#7:orbit",
+      "label": "orbit()",
+      "source_file": "app/lefty.py",
+      "start_line": 7
+    },
+    {
       "node_id": "app/main.py",
       "label": "main.py",
       "source_file": "app/main.py",
       "start_line": 1
     },
     {
-      "node_id": "app/main.py#10:run_bare",
+      "node_id": "app/main.py#12:run_bare",
       "label": "run_bare()",
       "source_file": "app/main.py",
-      "start_line": 10
+      "start_line": 12
     },
     {
-      "node_id": "app/main.py#5:run",
+      "node_id": "app/main.py#18:run_via_variable",
+      "label": "run_via_variable()",
+      "source_file": "app/main.py",
+      "start_line": 18
+    },
+    {
+      "node_id": "app/main.py#27:run_ambiguous_via_variable",
+      "label": "run_ambiguous_via_variable()",
+      "source_file": "app/main.py",
+      "start_line": 27
+    },
+    {
+      "node_id": "app/main.py#7:run",
       "label": "run()",
       "source_file": "app/main.py",
-      "start_line": 5
+      "start_line": 7
     },
     {
       "node_id": "app/models.py",
@@ -75,22 +135,67 @@
   ],
   "edges": [
     {
+      "source": "app/gizmo.py",
+      "target": "app/gizmo.py#1:Gizmo",
+      "relation": "contains"
+    },
+    {
+      "source": "app/gizmo.py#1:Gizmo",
+      "target": "app/gizmo.py#2:spin",
+      "relation": "method"
+    },
+    {
+      "source": "app/lefty.py",
+      "target": "app/lefty.py#1:Lefty",
+      "relation": "contains"
+    },
+    {
+      "source": "app/lefty.py",
+      "target": "app/lefty.py#6:Righty",
+      "relation": "contains"
+    },
+    {
+      "source": "app/lefty.py#1:Lefty",
+      "target": "app/lefty.py#2:orbit",
+      "relation": "method"
+    },
+    {
+      "source": "app/lefty.py#6:Righty",
+      "target": "app/lefty.py#7:orbit",
+      "relation": "method"
+    },
+    {
       "source": "app/main.py",
-      "target": "app/main.py#10:run_bare",
+      "target": "app/main.py#12:run_bare",
       "relation": "contains"
     },
     {
       "source": "app/main.py",
-      "target": "app/main.py#5:run",
+      "target": "app/main.py#18:run_via_variable",
       "relation": "contains"
     },
     {
-      "source": "app/main.py#5:run",
+      "source": "app/main.py",
+      "target": "app/main.py#27:run_ambiguous_via_variable",
+      "relation": "contains"
+    },
+    {
+      "source": "app/main.py",
+      "target": "app/main.py#7:run",
+      "relation": "contains"
+    },
+    {
+      "source": "app/main.py#18:run_via_variable",
+      "target": "app/gizmo.py#2:spin",
+      "relation": "calls"
+    },
+    {
+      "source": "app/main.py#7:run",
       "target": "app/models.py#2:build",
       "relation": "calls"
     },
     {
-      "source": "app/main.py#5:run",
+      "source": "app/main.py#7:run",
       "target": "app/util.py#5:caller",
       "relation": "calls"
     },

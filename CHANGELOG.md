@@ -93,6 +93,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that interface's sole implementation with zero Spring-specific knowledge involved anywhere in the
   edge (`docs/design/spring-aware-graph.md` §4.2).
 
+### Fixed
+
+- Instance calls through a **variable receiver** (`a.helper()`) now resolve on every tags-driven
+  language (Java, TypeScript, JavaScript, Python) — previously the most common call shape in
+  idiomatic code produced **zero** `calls` edges (issue #8). The tags-path qualifier extractor
+  (`graph::callee::receiver_qualifier`) recorded the receiver's own text as a type qualifier
+  (`a`), which could almost never textually equal the callable's declaring-type `scope` (`A`), so
+  `resolve::pick`'s single-candidate branch rejected the one correct candidate. A receiver is now
+  treated as a type qualifier only when it plausibly names a type (a capitalised identifier, per
+  Java/TS/Python convention — matching the existing `Foo.bar()` behaviour); a lowercase-initial
+  receiver (a variable or module) yields no qualifier, so the call falls through to bare-name
+  resolution — one candidate resolves, several are dropped as ambiguous, exactly like a bare call.
+
 ### Changed
 
 - `src/walk.rs` is now a thin filesystem-reader driver: `walk_checkout` builds an `FsSource`, pushes

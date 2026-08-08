@@ -84,6 +84,53 @@ fn has_method_nesting(g: &Graph) -> bool {
     g.edges.iter().any(|e| e.relation == "method")
 }
 
+/// Issue #8 assertion helper: the def labelled `caller_label` must resolve to exactly one `calls`
+/// edge, targeting the def labelled `target_label`. Used for the instance-call-through-a-variable
+/// fixture case (`g.spin()`), which the pre-fix resolver dropped entirely for every tags language.
+fn assert_resolves_to(g: &Graph, caller_label: &str, target_label: &str) {
+    let caller = g
+        .nodes
+        .iter()
+        .find(|n| n.label == caller_label)
+        .unwrap_or_else(|| panic!("{caller_label} node not found; nodes = {:?}", g.nodes));
+    let targets: Vec<_> = g
+        .edges
+        .iter()
+        .filter(|e| e.relation == "calls" && e.source == caller.node_id)
+        .collect();
+    assert_eq!(
+        targets.len(),
+        1,
+        "{caller_label} must resolve to exactly one target; got {targets:?}"
+    );
+    let dst = g
+        .nodes
+        .iter()
+        .find(|n| n.node_id == targets[0].target)
+        .expect("call target must be an emitted node");
+    assert_eq!(
+        dst.label, target_label,
+        "{caller_label} resolved to the wrong target; got {dst:?}"
+    );
+}
+
+/// The negative twin of [`assert_resolves_to`]: the def labelled `caller_label` must produce NO
+/// `calls` edge — a value receiver must not turn genuine same-name ambiguity into a guess.
+fn assert_call_is_dropped_as_ambiguous(g: &Graph, caller_label: &str) {
+    let caller = g
+        .nodes
+        .iter()
+        .find(|n| n.label == caller_label)
+        .unwrap_or_else(|| panic!("{caller_label} node not found; nodes = {:?}", g.nodes));
+    assert!(
+        !g.edges
+            .iter()
+            .any(|e| e.relation == "calls" && e.source == caller.node_id),
+        "{caller_label} must be dropped as ambiguous, not fanned out; edges = {:?}",
+        g.edges
+    );
+}
+
 // ── Python ──────────────────────────────────────────────────────────────────────────────────────
 
 #[test]
@@ -110,6 +157,24 @@ fn python_repo_run_bare_ambiguous_build_is_dropped() {
     );
 }
 
+#[test]
+fn python_repo_instance_call_via_variable_receiver_resolves() {
+    // Issue #8: `g = Gizmo(); g.spin()` — before the fix, the qualifier `g` never matched the
+    // callable's declaring-type scope `Gizmo`, so the resolver's single-candidate branch rejected
+    // the one correct candidate and this produced zero `calls` edges.
+    let g = assert_matches_golden("python-repo");
+    assert_resolves_to(&g, "run_via_variable()", "spin()");
+}
+
+#[test]
+fn python_repo_ambiguous_call_via_variable_receiver_is_still_dropped() {
+    // Negative twin: `l = Lefty(); l.orbit()` where `orbit` is defined on both Lefty and Righty —
+    // dropping the qualifier for a value receiver must fall through to the SAME ambiguity policy
+    // as a bare call, never guess.
+    let g = assert_matches_golden("python-repo");
+    assert_call_is_dropped_as_ambiguous(&g, "run_ambiguous_via_variable()");
+}
+
 // ── TypeScript ──────────────────────────────────────────────────────────────────────────────────
 
 #[test]
@@ -134,6 +199,21 @@ fn typescript_repo_run_bare_ambiguous_build_is_dropped() {
         "bare ambiguous build() must be dropped, not fanned out; edges = {:?}",
         g.edges
     );
+}
+
+#[test]
+fn typescript_repo_instance_call_via_variable_receiver_resolves() {
+    // Issue #8: `const g = new Gizmo(); g.spin()`.
+    let g = assert_matches_golden("typescript-repo");
+    assert_resolves_to(&g, "runViaVariable()", "spin()");
+}
+
+#[test]
+fn typescript_repo_ambiguous_call_via_variable_receiver_is_still_dropped() {
+    // Negative twin: `const l = new Lefty(); l.orbit()` where `orbit` is defined on both Lefty and
+    // Righty.
+    let g = assert_matches_golden("typescript-repo");
+    assert_call_is_dropped_as_ambiguous(&g, "runAmbiguousViaVariable()");
 }
 
 // ── JavaScript (incl. JSX) ──────────────────────────────────────────────────────────────────────
@@ -167,6 +247,21 @@ fn javascript_repo_run_bare_ambiguous_build_is_dropped() {
         "bare ambiguous build() must be dropped, not fanned out; edges = {:?}",
         g.edges
     );
+}
+
+#[test]
+fn javascript_repo_instance_call_via_variable_receiver_resolves() {
+    // Issue #8: `const g = new Gizmo(); g.spin()`.
+    let g = assert_matches_golden("javascript-repo");
+    assert_resolves_to(&g, "runViaVariable()", "spin()");
+}
+
+#[test]
+fn javascript_repo_ambiguous_call_via_variable_receiver_is_still_dropped() {
+    // Negative twin: `const l = new Lefty(); l.orbit()` where `orbit` is defined on both Lefty and
+    // Righty.
+    let g = assert_matches_golden("javascript-repo");
+    assert_call_is_dropped_as_ambiguous(&g, "runAmbiguousViaVariable()");
 }
 
 // ── TSX/JSX (React-shaped components) ──────────────────────────────────────────────────────────
@@ -226,6 +321,55 @@ fn java_repo_run_bare_ambiguous_build_is_dropped() {
         "bare ambiguous build() must be dropped, not fanned out; edges = {:?}",
         g.edges
     );
+}
+
+#[test]
+fn java_repo_instance_call_via_variable_receiver_resolves() {
+    // Issue #8: `Gizmo g = new Gizmo(); g.spin()` — before the fix, the qualifier `g` never
+    // matched the callable's declaring-type scope `Gizmo`, so the resolver's single-candidate
+    // branch rejected the one correct candidate and this produced zero `calls` edges.
+    let g = assert_matches_golden("java-repo");
+    assert_resolves_to(&g, "runViaVariable()", "spin()");
+}
+
+#[test]
+fn java_repo_call_via_variable_receiver_is_disambiguated_by_its_declared_type() {
+    // `Lefty l = new Lefty(); l.orbit()` where `orbit` is defined on BOTH Lefty and Righty. The
+    // declared type resolves it to Lefty's. Asserting the specific target is the point: both
+    // candidates share the label `orbit()`, so "an edge exists" would pass just as happily on a
+    // mis-attribution to Righty. Only the declared-type tier can resolve this at all — dropping
+    // the qualifier (issue #8's rule) leaves two candidates and nothing to choose with.
+    let g = assert_matches_golden("java-repo");
+    let src = g
+        .nodes
+        .iter()
+        .find(|n| n.label == "runDisambiguatedByDeclaredType()")
+        .expect("caller node");
+    let calls: Vec<_> = g
+        .edges
+        .iter()
+        .filter(|e| e.relation == "calls" && e.source == src.node_id)
+        .collect();
+    assert_eq!(calls.len(), 1, "exactly one target; got {calls:?}");
+    let target = g
+        .nodes
+        .iter()
+        .find(|n| n.node_id == calls[0].target)
+        .expect("target must be an emitted node");
+    assert_eq!(
+        (target.source_file.as_str(), target.start_line),
+        ("Lefty.java", 2),
+        "must resolve to Lefty.orbit (Lefty.java:2), not Righty.orbit (Lefty.java:8); got {target:?}"
+    );
+}
+
+#[test]
+fn java_repo_call_via_an_interface_typed_receiver_with_two_impls_is_still_dropped() {
+    // The negative twin that survives declared-type recovery: `Orbiter o` names an interface both
+    // Lefty and Righty implement, so the qualifier matches BOTH through their `implements` clause.
+    // Two genuine candidates, nothing to choose between them — dropped, never guessed.
+    let g = assert_matches_golden("java-repo");
+    assert_call_is_dropped_as_ambiguous(&g, "runAmbiguousViaInterface()");
 }
 
 // ── TypeScript: single-impl interface method (issue #5, the tags-path twin of #1) ────────────────
