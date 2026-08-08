@@ -19,7 +19,7 @@ fn golden_path() -> PathBuf {
 
 /// Canonical JSON for the graph: nodes/edges are already sorted+deduped by `resolve`, so a plain
 /// pretty-print is stable.
-fn canonical_json(out: &lci_codegraph::WalkOutput) -> String {
+fn canonical_json(out: &lci_codegraph::IndexOutput) -> String {
     serde_json::to_string_pretty(&out.graph).expect("graph serialises")
 }
 

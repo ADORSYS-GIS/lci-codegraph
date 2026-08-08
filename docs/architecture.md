@@ -5,32 +5,89 @@ fits together, based on the code as it stands — not the aspirational shape.
 
 ## The one-parse design
 
-Everything downstream of a source file starts from a single `tree_sitter::Tree`. `src/walk.rs`
-(`walk_checkout`) parses each file **once** (`lang::parse`) and hands that one tree to both:
+Everything downstream of a source file starts from a single `tree_sitter::Tree` — and, since the
+raw-inputs cutover (ADR-0086), everything upstream of that starts from a
+[`RawInput`](../src/input.rs) rather than a file on disk. `src/input.rs`'s `Indexer::push` is where
+the one-parse decision is actually made: given one `RawInput`, it parses the content **once**
+(`lang::parse`) and hands that one tree to both:
 
 - the chunker (`chunk::chunk_tree`), and
-- the graph extractor (`graph::extract_file`), when `WalkOptions::build_graph` is set.
+- the graph extractor (`graph::extract_file`), when `IndexOptions::build_graph` is set.
 
-This only happens on the fast path — a language with a real graph extractor
-(`lang::has_graph(language)`). If graph extraction is off, or the language has no extractor, the file
+`Indexer::push` never touches a filesystem itself — it only ever sees a `RawInput` that something
+else already produced. `src/walk.rs`'s `FsSource` is what turns a checkout into that stream of
+`RawInput`s: it walks the tree, applies both ignore layers, reads each surviving file's bytes, and
+yields one `RawInput` per file. `walk_checkout` is the thin driver that wires the two together —
+build an `FsSource`, `push` everything it yields into an `Indexer`, record the pruned count, `finish`.
+Nothing about the one-parse design is specific to the filesystem: any other reader that can produce
+`RawInput`s (a git object store, a tarball, an HTTP fetch, editor buffers, DB rows) gets the same
+one-parse behaviour for free by feeding the same `Indexer`. See the "reader/indexer seam" section
+below for what belongs on which side of that line.
+
+This one-parse path only happens on the fast path — a language with a real graph extractor
+(`lang::has_graph(language)`). If graph extraction is off, or the language has no extractor, the input
 is chunked via `chunk::chunk_file`, which re-parses internally if it needs to; there is no second
 parse when both chunking and graph extraction run, which is the case the one-parse design exists for.
 
 ```mermaid
 flowchart TD
-    A["walk_checkout(root, options)"] --> B{"has_graph(language)<br/>&& build_graph?"}
+    R["reader (e.g. FsSource)<br/>— other readers could sit here too"] --> RI["RawInput { path, content, language }"]
+    RI --> P["Indexer::push"]
+    P --> B{"has_graph(language)<br/>&& build_graph?"}
     B -- yes --> C["lang::parse (once)"]
     C --> D["chunk::chunk_tree"]
     C --> E["graph::extract_file"]
     B -- no --> F["chunk::chunk_file<br/>(chunks only)"]
     E --> G["FileSymbols<br/>(nodes, contains/method edges,<br/>unresolved call sites, callables)"]
-    G -.->|"collected across all files"| H["graph::resolve(Vec&lt;FileSymbols&gt;)"]
-    H --> I["canonical Graph<br/>(sorted + deduped)"]
+    G -.->|"collected across all pushed inputs"| H["Indexer::finish"]
+    H --> I["graph::resolve(Vec&lt;FileSymbols&gt;)"]
+    I --> J["canonical Graph<br/>(sorted + deduped)"]
 ```
 
-`walk_checkout` collects one `FileSymbols` per graph-eligible file into a `Vec<FileSymbols>`, then
-calls `graph::resolve` exactly once at the end, over the whole checkout — cross-file resolution needs
-every file's definitions to exist before it can attribute a call correctly.
+`Indexer` collects one `FileSymbols` per graph-eligible input into a `Vec<FileSymbols>` as `push` is
+called, then `finish` calls `graph::resolve` exactly once at the end, over everything that was pushed
+— cross-file resolution needs every input's definitions to exist before it can attribute a call
+correctly.
+
+## The reader/indexer seam
+
+`src/input.rs` and `src/walk.rs` are split along a deliberate seam, and the module doc comments on
+both sides say so explicitly — this section is the model to follow when reasoning about it, or when
+deciding which side a new piece of logic belongs on.
+
+`crate::input` is the source-agnostic core: `RawInput`, `IndexOptions`, `Indexer`, `index_inputs`. It
+knows a path and some bytes and nothing else — not where they came from, not whether a filesystem was
+ever involved. Everything it does is a function of the bytes it was handed: the byte cap, the
+UTF-8/binary sniff, language detection, the one-parse chunk+graph dispatch, PDF extraction.
+
+`crate::walk` is one *reader*: `FsSource`, a filesystem-specific `Iterator<Item = RawInput>`, plus the
+`walk_checkout` convenience driver built on top of it. A reader's job is narrower than it looks from
+the outside — it does not index anything itself. It only decides *which* inputs are worth producing
+at all, and turns each surviving one into a `RawInput`.
+
+**Path filtering — the ignore layers — sits in the reader, not the indexer, and this is the one rule
+worth internalising about the seam.** It would be easy to imagine `Indexer::push` taking a path and
+deciding whether to bother with it. That is exactly backwards: by the time a `RawInput` reaches
+`push`, its bytes have already been read off disk (or fetched over HTTP, or pulled from a DB row) —
+the expensive part is done. A reader that knows in advance it will discard a path (a `.gitignore`d
+file, a `node_modules` subtree, an operator-configured glob) can skip producing the `RawInput` for it
+entirely, and `FsSource` does exactly that: its `filter_entry` callback prunes a directory *before
+walking into it*, so an ignored subtree's files are never even stat'd, let alone read. Putting that
+decision in `Indexer::push` instead would mean every reader — including ones for which "path" barely
+means anything, like a database row — pays to produce an input just to have it thrown away, and would
+give the indexing core an ignore-list dependency it has no other reason to carry. `Indexer` does still
+participate: a reader that pruned inputs before `push` ever saw them reports the count via
+`Indexer::record_pruned`, so `IndexStats::paths_ignored` reflects reader-side pruning without the
+indexer needing to know *why* those inputs never arrived.
+
+What *does* belong on the indexer side, correspondingly, is anything that can only be decided from the
+content itself, because a reader — by construction — has not looked at the bytes yet when it decides
+whether to hand them over. The byte cap, the UTF-8 decode, the binary content sniff, and language
+detection are all content-level judgment calls `Indexer::push` makes once it has the bytes in hand;
+`MAX_INPUT_BYTES` is the one exception that leans the other way on purpose — it is a content-level
+constant, but reader-facing, specifically so a reader can bound its own read at the I/O level (as
+`FsSource` does, reading at most `MAX_INPUT_BYTES + 1` bytes) rather than pulling an oversized input
+into memory whole only to have `push` reject it after the fact.
 
 ## The `Classifier` seam
 

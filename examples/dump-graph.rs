@@ -6,7 +6,7 @@
 //!
 //! Walks `<path>` with `build_graph = true` and prints the resulting [`lci_codegraph::Graph`] as
 //! JSON to stdout (one line, no pretty-printing — deterministic and cheap to diff across runs) and
-//! the [`lci_codegraph::WalkStats`] as a one-line debug dump to stderr. Deliberately dependency-free
+//! the [`lci_codegraph::IndexStats`] as a one-line debug dump to stderr. Deliberately dependency-free
 //! beyond `lci_codegraph` and `serde_json`, both already crate dependencies.
 
 use std::path::PathBuf;

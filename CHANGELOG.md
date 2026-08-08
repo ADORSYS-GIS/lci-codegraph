@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Source-agnostic indexing core (`src/input.rs`, ADR-0086): `RawInput` (a logical path plus bytes,
+  with an optional explicit `language` override), `IndexOptions`, a push-based `Indexer`
+  (`new`/`push`/`record_pruned`/`finish`), and the `index_inputs(iter, &options)` convenience. A
+  filesystem checkout is now one *reader* among several possible ones — a caller with content already
+  in memory (a git object store, a tarball stream, an HTTP fetch, editor buffers, DB rows) can index it
+  directly, with no checkout materialised on disk.
+- `FsSource`: the filesystem reader, now public and directly usable as an `Iterator<Item = RawInput>`,
+  so filesystem inputs can be mixed with in-memory ones in a single `Indexer`.
+- `IndexStats::files_skipped_too_large` and `IndexStats::files_skipped_unsupported` counters, so a
+  too-large input and an input with no determinable language are each individually diagnosable instead
+  of both looking like "nothing got indexed."
+
+### Changed
+
+- `src/walk.rs` is now a thin filesystem-reader driver: `walk_checkout` builds an `FsSource`, pushes
+  every input it yields into an `Indexer`, records the pruned count, and calls `finish` — the one-parse
+  chunk/graph logic itself now lives in `Indexer::push`, not in `walk.rs`.
+- `IndexStats::files_skipped_binary` now also covers content that fails UTF-8 decoding outright;
+  previously that path incremented no counter at all.
+- The operator/gitignore path-filtering layer now lives entirely in the reader (`FsSource`), not in the
+  indexing core — deciding which inputs are worth handing over is the reader's job, because only the
+  reader can avoid paying to produce an input that would just be discarded.
+
+### BREAKING
+
+- `WalkOutput` and `WalkStats` are renamed to `IndexOutput` and `IndexStats`. Migration: replace
+  `WalkOutput`/`WalkStats` with `IndexOutput`/`IndexStats` wherever they're named (the field shapes are
+  unchanged, plus the two new counters above) — `walk_checkout`/`walk_checkout_from_env`'s signatures
+  are otherwise unchanged.
+
 ## [0.1.0] - 2026-08-07
 
 ### Added
