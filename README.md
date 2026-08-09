@@ -270,6 +270,17 @@ flowchart LR
 | TSX | `.tsx` | tree-sitter (JSX-aware grammar) | Same composed JS+TS `tags.scm`, run against the dedicated TSX grammar (the plain TypeScript grammar cannot parse JSX) |
 | Java | `.java` | tree-sitter | The grammar's bundled `tags.scm` (`tree-sitter-java::TAGS_QUERY`) |
 
+A second, smaller set of extensions has **no tree-sitter grammar** and therefore no structural graph,
+but does carry a language tag so the windowed-text fallback applies — those files are chunked,
+embedded, and semantically searchable, they simply contribute no nodes or edges: `.kt`/`.kts`
+(Kotlin), `.gradle` (Groovy), `.go`, `.c`/`.h`, `.cpp`/`.cc`/`.cxx`/`.hpp`, and
+`.md`/`.txt`/`.toml`/`.yaml`/`.yml`/`.json` (tagged `text`).
+
+The distinction matters more than it looks. A tag buys **retrieval**; a grammar buys **structure**.
+An extension in neither list is dropped before chunking and produces nothing at all — no chunk, no
+embedding, no search hit. `examples/apps/spring-boot-gradle-kotlin` is a committed sample of a
+language in the middle state: fully searchable, structurally invisible.
+
 For every one of these, chunking and graph extraction share the **same** parse of the file
 (`WalkOptions::build_graph`).
 

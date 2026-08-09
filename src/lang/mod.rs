@@ -115,6 +115,15 @@ pub fn from_path(path: &Path) -> Option<&'static str> {
     }
     match path.extension().and_then(|e| e.to_str()) {
         Some("go") => Some("go"),
+        // Kotlin and Groovy build scripts have no grammar here either, but they are *source* — and
+        // without a tag they are not merely ungraphed, they are dropped before chunking, so they
+        // produce no chunks, no embeddings, and no semantic-search hits at all. A Kotlin Spring
+        // Boot service was therefore invisible to this crate end to end
+        // (`examples/apps/spring-boot-gradle-kotlin` is that case, committed as a fixture). Tagging
+        // them buys the windowed-text fallback: searchable, still not graphed. The `has_graph`
+        // check downstream is what keeps the graph honest — a tag here is not a claim of extraction.
+        Some("kt" | "kts") => Some("kotlin"),
+        Some("gradle") => Some("groovy"),
         Some("c" | "h") => Some("c"),
         Some("cpp" | "cc" | "cxx" | "hpp") => Some("cpp"),
         Some("md" | "txt" | "toml" | "yaml" | "yml" | "json") => Some("text"),
@@ -161,6 +170,11 @@ mod tests {
         assert_eq!(from_path(Path::new("src/App.tsx")), Some("tsx"));
         assert_eq!(from_path(Path::new("src/api.ts")), Some("typescript"));
         assert_eq!(from_path(Path::new("README.md")), Some("text"));
+        // Tagged so they are chunked and searchable, NOT because they are graphed — see `has_graph`
+        // below. Before this, a `.kt` file was dropped before chunking and produced nothing at all.
+        assert_eq!(from_path(Path::new("src/App.kt")), Some("kotlin"));
+        assert_eq!(from_path(Path::new("build.gradle.kts")), Some("kotlin"));
+        assert_eq!(from_path(Path::new("build.gradle")), Some("groovy"));
         assert_eq!(from_path(Path::new("image.png")), None);
         assert_eq!(
             from_path(Path::new("doc.pdf")),
@@ -179,6 +193,10 @@ mod tests {
         assert!(has_graph("java"));
         // A language we chunk but have no graph extractor for must NOT claim graph support.
         assert!(!has_graph("go"));
+        // A language tag is not a graph extractor. Kotlin/Groovy are chunked via the windowed-text
+        // fallback so they are semantically searchable, and must NOT claim structural extraction.
+        assert!(!has_graph("kotlin"));
+        assert!(!has_graph("groovy"));
         assert!(!has_graph("c"));
         assert!(!has_graph("text"));
     }
