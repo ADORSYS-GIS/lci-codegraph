@@ -26,6 +26,12 @@ That is the point of committing them. "Here is what the graph looks like for a S
 claim; a file a test regenerates is a fact, and it breaks loudly when the extractor drifts from what
 the documentation shows.
 
+The byte-stability test above answers "did the graph change." [`METRICS.md`](METRICS.md) answers a
+different question — coverage, not stability: how much of each app actually got graphed, resolved, and
+recognised as a framework, broken down per language, and whether that is trending up or down run to
+run. It is generated (never hand-edited) by `tests/examples_metrics.rs`, alongside the machine-readable
+baseline `metrics.json` that file's drift report compares against on every run.
+
 | Sample | Stack | Nodes | Edges | `calls` | Routes | Services |
 |---|---|---:|---:|---:|---:|---:|
 | [spring-boot-maven-java](apps/spring-boot-maven-java) | Spring Boot 3, Maven, Java | 47 | 47 | 13 | 5 | 1 |
