@@ -206,8 +206,9 @@ same id — no counters, no UUIDs.
 
 ## Cross-file resolution
 
-`graph::resolve::resolve(files: Vec<FileSymbols>, framework: Vec<FrameworkFacts>) -> Graph` is the
-only place that looks across files. It builds two lookup tables keyed by bare callee name:
+`graph::resolve::resolve(files: Vec<FileSymbols>, framework: Vec<FrameworkFacts>) -> (Graph,
+ResolveStats)` is the only place that looks across files. It builds two lookup tables keyed by bare
+callee name:
 
 1. a **global** table (`HashMap<&str, Vec<&Callable>>`) covering every callable in every file, and
 2. for each file in turn, a **local** table covering only that file's callables.
@@ -253,8 +254,15 @@ enum Pick<'a> {
 
 Concretely: if `foo()` is defined in two files and the call site has no qualifier that can tell them
 apart, `resolve` produces **no** `calls` edge for that call — not one arbitrary one, and not two. This
-trades recall for never mis-attributing a call to the wrong definition. `ambiguous`/`unresolved`
-counts are logged (`tracing::debug!`) so this is visible, not silent.
+trades recall for never mis-attributing a call to the wrong definition. The `resolved`/`ambiguous`/
+`unresolved` counts are still logged (`tracing::debug!`), but they are also **returned** as
+[`lci_codegraph_model::ResolveStats`], the second element of `resolve`'s `(Graph, ResolveStats)`
+return value, and carried through into [`crate::IndexStats`] (`calls_resolved`/`calls_ambiguous`/
+`calls_unresolved`) by `Indexer::finish` — so a caller can compute `calls edges / (calls edges +
+ambiguous + unresolved)`, a real resolution-rate denominator, rather than only ever seeing the
+numerator (the `calls` edges themselves) with no way to ask what fraction of the repo's call sites
+that numerator represents. `ResolveStats::resolution_rate()` computes exactly that fraction, `0.0`
+rather than `NaN` when there were no call sites at all.
 
 Qualifiers themselves are recovered structurally, not through type inference:
 `graph::callee::qualifier_from_callee_node` looks at the callee name node's *immediate* parent in the
@@ -334,9 +342,12 @@ flowchart LR
 ```
 
 When `IndexOptions::build_graph` is `false`, `graph::resolve` is never called and `Indexer::finish`
-returns `Graph::default()` — an empty graph with no nodes and no edges. `ContextIndex::build` over that
-still succeeds (there's simply nothing to index), so every chunk maps to no node and every header
-degrades to `file:`/`language:`/symbol only. `embed` being configured does not implicitly flip
+returns `Graph::default()` — an empty graph with no nodes and no edges — and every one of
+`IndexStats::calls_resolved`/`calls_ambiguous`/`calls_unresolved` stays `0` too, since there is no
+`ResolveStats` to carry through. That zero means "resolution never ran," not "every call site failed
+to resolve" — a caller must not read it as a resolution-quality signal for a graph-less run.
+`ContextIndex::build` over that still succeeds (there's simply nothing to index), so every chunk maps
+to no node and every header degrades to `file:`/`language:`/symbol only. `embed` being configured does not implicitly flip
 `build_graph` on to get a better header: that would silently change the cost profile — a full parse
 plus a cross-file resolve pass — of a walk the caller configured without it. `walk_checkout` logs a
 `tracing::warn!` once instead and proceeds with the degraded header.

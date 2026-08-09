@@ -151,6 +151,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   behaviour exactly, so any caller with no framework facts to contribute (every non-Java caller, and
   every Java repo `lci-codegraph-spring` found nothing Spring-specific in) is unaffected by
   construction, not by a flag.
+- **Breaking:** `graph::resolve` now returns its call-resolution counters instead of only logging
+  them: `resolve(files, framework) -> Graph` is now `resolve(files, framework) -> (Graph,
+  ResolveStats)`. `lci_codegraph_model::ResolveStats` (`calls_resolved`/`calls_ambiguous`/
+  `calls_unresolved`, plus `call_sites()` and `resolution_rate()`) is what previously only reached a
+  `tracing::debug!` line — there was a numerator (`calls` edges) with no denominator, so no consumer
+  could ever answer "what fraction of this repo's call sites did we actually resolve?" Migration:
+  `let graph = resolve(f, fw);` → `let (graph, stats) = resolve(f, fw);`. `IndexStats` (`src/input.rs`)
+  gained the same three counters, populated by `Indexer::finish` from the `ResolveStats` `resolve`
+  returns; they stay `0` when `IndexOptions::build_graph` is `false`, since `resolve` never runs — read
+  that as "resolution never happened," not "every call site failed to resolve." No graph output
+  changed: every committed golden under `tests/golden/` and every `examples/apps/*/graph.json` is
+  byte-identical to before this change.
 
 ## [0.1.0] - 2026-08-07
 

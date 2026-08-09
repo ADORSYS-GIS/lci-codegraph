@@ -22,6 +22,66 @@
 
 use serde::Serialize;
 
+/// Call-resolution counters from one `graph::resolve` run — the denominator that turns "how many
+/// `calls` edges exist" into "what fraction of this repo's call sites did we actually resolve."
+///
+/// The three buckets are **mutually exclusive and exhaustive** over every call site the resolver
+/// processed: each one lands in exactly `calls_resolved` XOR `calls_ambiguous` XOR
+/// `calls_unresolved`, never more than one and never none.
+///
+/// The distinction between `calls_ambiguous` and `calls_unresolved` is meaningful, not cosmetic:
+/// - `calls_ambiguous` — several same-named candidates existed (locally or globally) and the
+///   resolver's precision-favouring policy (ADR-0086 R5, `graph::resolve::pick`) dropped the call
+///   deliberately rather than guess or fan out. A rising count here is a **resolver-quality signal**:
+///   either the codebase has genuinely ambiguous same-named callables, or a qualifier the resolver
+///   should be recovering (and isn't) would have narrowed it.
+/// - `calls_unresolved` — no candidate existed anywhere, in any table. This is the expected, common
+///   case for a call into a third-party dependency, a language built-in, or a language feature the
+///   extractor does not model (e.g. a dynamic dispatch it can't see through). A high count here on a
+///   repo full of third-party calls is **not a defect**.
+///
+/// Conflating the two would hide the one signal (`calls_ambiguous`) that is actually actionable
+/// behind the one that mostly isn't (`calls_unresolved`).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct ResolveStats {
+    /// Call sites the resolver matched to exactly one candidate and emitted a `calls` edge for.
+    /// Counted as edges are pushed during resolution, **not** derived from the final deduped edge
+    /// count: identical duplicate call sites (e.g. `helper(); helper();`) collapse into one edge
+    /// during `resolve`'s canonicalisation pass, so a post-dedup count would understate how many call
+    /// sites were actually processed and successfully resolved.
+    pub calls_resolved: usize,
+    /// Call sites dropped as genuinely ambiguous — see the type's own doc comment.
+    pub calls_ambiguous: usize,
+    /// Call sites with no matching candidate anywhere — see the type's own doc comment.
+    pub calls_unresolved: usize,
+}
+
+impl ResolveStats {
+    /// Total recorded call sites: every one landed in exactly one of the three buckets, so this is
+    /// their sum.
+    #[must_use]
+    pub fn call_sites(&self) -> usize {
+        self.calls_resolved + self.calls_ambiguous + self.calls_unresolved
+    }
+
+    /// Fraction of recorded call sites that resolved to a `calls` edge, in `[0.0, 1.0]`.
+    ///
+    /// `0.0` when there are no call sites at all (a repo with no calls has no resolution rate to
+    /// speak of — there is nothing to be a fraction *of*). Deliberately not `NaN`: a `0/0` division
+    /// would produce `NaN` in IEEE 754, and `NaN` poisons any downstream aggregation (mean, sum,
+    /// comparison) that touches it — a caller averaging this rate across many repos should see a
+    /// no-calls repo as "0% resolved," not have its whole aggregate turn into `NaN`.
+    #[must_use]
+    pub fn resolution_rate(&self) -> f64 {
+        let call_sites = self.call_sites();
+        if call_sites == 0 {
+            0.0
+        } else {
+            self.calls_resolved as f64 / call_sites as f64
+        }
+    }
+}
+
 /// One graph node. Field set mirrors `agent-clients::GraphNodePayload` exactly (`node_id`, `label`,
 /// `source_file`, `start_line`) — the schema this crate's output has been payload-compatible with since
 /// the retired Python Graphify CLI (ADR-0019 → ADR-0086).
@@ -256,5 +316,62 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(a, b);
+    }
+
+    // ── ResolveStats ────────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn default_resolve_stats_has_zero_call_sites_and_a_zero_resolution_rate() {
+        let stats = ResolveStats::default();
+        assert_eq!(stats.call_sites(), 0);
+        assert_eq!(
+            stats.resolution_rate(),
+            0.0,
+            "an empty run must report 0.0, never NaN, so downstream aggregation is never poisoned"
+        );
+        assert!(!stats.resolution_rate().is_nan());
+    }
+
+    #[test]
+    fn call_sites_is_the_sum_of_all_three_buckets() {
+        let stats = ResolveStats {
+            calls_resolved: 7,
+            calls_ambiguous: 2,
+            calls_unresolved: 5,
+        };
+        assert_eq!(stats.call_sites(), 14);
+    }
+
+    #[test]
+    fn resolution_rate_is_calls_resolved_over_call_sites() {
+        let stats = ResolveStats {
+            calls_resolved: 3,
+            calls_ambiguous: 1,
+            calls_unresolved: 0,
+        };
+        assert_eq!(stats.resolution_rate(), 0.75);
+    }
+
+    #[test]
+    fn resolution_rate_is_one_when_every_call_site_resolved() {
+        let stats = ResolveStats {
+            calls_resolved: 5,
+            calls_ambiguous: 0,
+            calls_unresolved: 0,
+        };
+        assert_eq!(stats.resolution_rate(), 1.0);
+    }
+
+    #[test]
+    fn resolve_stats_round_trips_through_json() {
+        let stats = ResolveStats {
+            calls_resolved: 1,
+            calls_ambiguous: 2,
+            calls_unresolved: 3,
+        };
+        let json = serde_json::to_string(&stats).expect("stats serialise");
+        assert!(json.contains("\"calls_resolved\":1"));
+        assert!(json.contains("\"calls_ambiguous\":2"));
+        assert!(json.contains("\"calls_unresolved\":3"));
     }
 }
