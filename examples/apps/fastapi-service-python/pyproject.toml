@@ -1,0 +1,13 @@
+[project]
+name = "catalog-api"
+version = "0.1.0"
+description = "FastAPI catalog service"
+
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

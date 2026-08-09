@@ -1,0 +1,220 @@
+{
+  "nodes": [
+    {
+      "node_id": "src/app.module.ts",
+      "label": "app.module.ts",
+      "source_file": "src/app.module.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/app.module.ts#10:AppModule",
+      "label": "AppModule",
+      "source_file": "src/app.module.ts",
+      "start_line": 10
+    },
+    {
+      "node_id": "src/main.ts",
+      "label": "main.ts",
+      "source_file": "src/main.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/main.ts#5:bootstrap",
+      "label": "bootstrap()",
+      "source_file": "src/main.ts",
+      "start_line": 5
+    },
+    {
+      "node_id": "src/notifications/notification.controller.ts",
+      "label": "notification.controller.ts",
+      "source_file": "src/notifications/notification.controller.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/notifications/notification.controller.ts#14:createNotification",
+      "label": "createNotification()",
+      "source_file": "src/notifications/notification.controller.ts",
+      "start_line": 14
+    },
+    {
+      "node_id": "src/notifications/notification.controller.ts#19:deleteNotification",
+      "label": "deleteNotification()",
+      "source_file": "src/notifications/notification.controller.ts",
+      "start_line": 19
+    },
+    {
+      "node_id": "src/notifications/notification.controller.ts#5:NotificationController",
+      "label": "NotificationController",
+      "source_file": "src/notifications/notification.controller.ts",
+      "start_line": 5
+    },
+    {
+      "node_id": "src/notifications/notification.controller.ts#9:getNotification",
+      "label": "getNotification()",
+      "source_file": "src/notifications/notification.controller.ts",
+      "start_line": 9
+    },
+    {
+      "node_id": "src/notifications/notification.repository.ts",
+      "label": "notification.repository.ts",
+      "source_file": "src/notifications/notification.repository.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/notifications/notification.repository.ts#12:insert",
+      "label": "insert()",
+      "source_file": "src/notifications/notification.repository.ts",
+      "start_line": 12
+    },
+    {
+      "node_id": "src/notifications/notification.repository.ts#19:remove",
+      "label": "remove()",
+      "source_file": "src/notifications/notification.repository.ts",
+      "start_line": 19
+    },
+    {
+      "node_id": "src/notifications/notification.repository.ts#4:NotificationRepository",
+      "label": "NotificationRepository",
+      "source_file": "src/notifications/notification.repository.ts",
+      "start_line": 4
+    },
+    {
+      "node_id": "src/notifications/notification.repository.ts#8:findById",
+      "label": "findById()",
+      "source_file": "src/notifications/notification.repository.ts",
+      "start_line": 8
+    },
+    {
+      "node_id": "src/notifications/notification.service.ts",
+      "label": "notification.service.ts",
+      "source_file": "src/notifications/notification.service.ts",
+      "start_line": 1
+    },
+    {
+      "node_id": "src/notifications/notification.service.ts#12:create",
+      "label": "create()",
+      "source_file": "src/notifications/notification.service.ts",
+      "start_line": 12
+    },
+    {
+      "node_id": "src/notifications/notification.service.ts#16:delete",
+      "label": "delete()",
+      "source_file": "src/notifications/notification.service.ts",
+      "start_line": 16
+    },
+    {
+      "node_id": "src/notifications/notification.service.ts#5:NotificationService",
+      "label": "NotificationService",
+      "source_file": "src/notifications/notification.service.ts",
+      "start_line": 5
+    },
+    {
+      "node_id": "src/notifications/notification.service.ts#8:findById",
+      "label": "findById()",
+      "source_file": "src/notifications/notification.service.ts",
+      "start_line": 8
+    }
+  ],
+  "edges": [
+    {
+      "source": "src/app.module.ts",
+      "target": "src/app.module.ts#10:AppModule",
+      "relation": "contains"
+    },
+    {
+      "source": "src/main.ts",
+      "target": "src/main.ts#5:bootstrap",
+      "relation": "contains"
+    },
+    {
+      "source": "src/notifications/notification.controller.ts",
+      "target": "src/notifications/notification.controller.ts#5:NotificationController",
+      "relation": "contains"
+    },
+    {
+      "source": "src/notifications/notification.controller.ts#14:createNotification",
+      "target": "src/notifications/notification.service.ts#12:create",
+      "relation": "calls"
+    },
+    {
+      "source": "src/notifications/notification.controller.ts#19:deleteNotification",
+      "target": "src/notifications/notification.service.ts#16:delete",
+      "relation": "calls"
+    },
+    {
+      "source": "src/notifications/notification.controller.ts#5:NotificationController",
+      "target": "src/notifications/notification.controller.ts#14:createNotification",
+      "relation": "method"
+    },
+    {
+      "source": "src/notifications/notification.controller.ts#5:NotificationController",
+      "target": "src/notifications/notification.controller.ts#19:deleteNotification",
+      "relation": "method"
+    },
+    {
+      "source": "src/notifications/notification.controller.ts#5:NotificationController",
+      "target": "src/notifications/notification.controller.ts#9:getNotification",
+      "relation": "method"
+    },
+    {
+      "source": "src/notifications/notification.repository.ts",
+      "target": "src/notifications/notification.repository.ts#4:NotificationRepository",
+      "relation": "contains"
+    },
+    {
+      "source": "src/notifications/notification.repository.ts#19:remove",
+      "target": "src/notifications/notification.service.ts#16:delete",
+      "relation": "calls"
+    },
+    {
+      "source": "src/notifications/notification.repository.ts#4:NotificationRepository",
+      "target": "src/notifications/notification.repository.ts#12:insert",
+      "relation": "method"
+    },
+    {
+      "source": "src/notifications/notification.repository.ts#4:NotificationRepository",
+      "target": "src/notifications/notification.repository.ts#19:remove",
+      "relation": "method"
+    },
+    {
+      "source": "src/notifications/notification.repository.ts#4:NotificationRepository",
+      "target": "src/notifications/notification.repository.ts#8:findById",
+      "relation": "method"
+    },
+    {
+      "source": "src/notifications/notification.service.ts",
+      "target": "src/notifications/notification.service.ts#5:NotificationService",
+      "relation": "contains"
+    },
+    {
+      "source": "src/notifications/notification.service.ts#12:create",
+      "target": "src/notifications/notification.repository.ts#12:insert",
+      "relation": "calls"
+    },
+    {
+      "source": "src/notifications/notification.service.ts#16:delete",
+      "target": "src/notifications/notification.repository.ts#19:remove",
+      "relation": "calls"
+    },
+    {
+      "source": "src/notifications/notification.service.ts#5:NotificationService",
+      "target": "src/notifications/notification.service.ts#12:create",
+      "relation": "method"
+    },
+    {
+      "source": "src/notifications/notification.service.ts#5:NotificationService",
+      "target": "src/notifications/notification.service.ts#16:delete",
+      "relation": "method"
+    },
+    {
+      "source": "src/notifications/notification.service.ts#5:NotificationService",
+      "target": "src/notifications/notification.service.ts#8:findById",
+      "relation": "method"
+    },
+    {
+      "source": "src/notifications/notification.service.ts#8:findById",
+      "target": "src/notifications/notification.service.ts#8:findById",
+      "relation": "calls"
+    }
+  ]
+}
