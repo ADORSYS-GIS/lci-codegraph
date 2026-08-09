@@ -40,12 +40,14 @@ the documentation shows.
 
 Four of the seven columns above are mostly zero, and that is the most useful part of the table.
 
-**Kotlin produces nothing at all.** Not a reduced graph — an empty one. There is no Kotlin grammar in
-this crate, and `.kt` is not even in the extension fallback, so those files are skipped before
-anything looks at them. That sample is committed *because* the answer is "nothing": a Kotlin Spring
-Boot service is a very common thing to point a code-intelligence tool at, and an empty committed
-graph answers "does this work on mine?" immediately instead of after an afternoon. It also hands
-whoever adds the grammar a fixture whose expected output is already wired up.
+**Kotlin produces no graph at all.** Not a reduced one — an empty one. There is no Kotlin grammar in
+this crate, so nothing in that app is parsed into definitions or calls. Its source *is* chunked and
+searchable (`.kt`/`.kts` carry a language tag, so the windowed-text fallback applies), which is the
+distinction worth holding onto: a language tag buys retrieval, not structure. That sample is
+committed *because* the structural answer is "nothing": a Kotlin Spring Boot service is a very common
+thing to point a code-intelligence tool at, and an empty committed graph answers "does this work on
+mine?" immediately instead of after an afternoon. It also hands whoever adds the grammar a fixture
+whose expected output is already wired up.
 
 **Route nodes are Spring-only.** NestJS's `@Controller('notifications')` / `@Get(':id')` and FastAPI's
 `@app.get("/products/{sku}")` are structurally almost identical to Spring's annotations, and are

@@ -273,12 +273,15 @@ fn axum_service_rust_graph_matches_its_committed_graph_json() {
 fn spring_boot_gradle_kotlin_produces_an_empty_graph_because_kotlin_has_no_extractor() {
     // Deliberately committed as an EMPTY graph, not omitted from the gallery.
     //
-    // There is no Kotlin grammar in this crate, and `.kt` is not even in `lang::from_path`'s
-    // extension fallback, so every Kotlin file is skipped outright — not chunked, not parsed,
-    // absent from the graph. A Kotlin Spring Boot service is an extremely common thing to point a
-    // code-intelligence tool at, and someone will try it; a committed empty graph answers "does
-    // this work on my Kotlin service?" honestly and immediately, and gives whoever adds the grammar
-    // a ready-made fixture whose expected output is already wired up.
+    // There is no Kotlin grammar in this crate, so no Kotlin file is ever parsed into definitions or
+    // calls. Note what this does NOT say: `.kt`/`.kts` do carry a language tag, so those files are
+    // chunked through the windowed-text fallback and are semantically searchable. Retrieval and
+    // structural extraction are separate capabilities, and this app has exactly one of them.
+    //
+    // A Kotlin Spring Boot service is an extremely common thing to point a code-intelligence tool
+    // at, and someone will try it; a committed empty graph answers "does this work on my Kotlin
+    // service?" honestly and immediately, and gives whoever adds the grammar a ready-made fixture
+    // whose expected output is already wired up.
     let g = assert_matches_graph("spring-boot-gradle-kotlin");
     assert!(
         g.nodes.is_empty() && g.edges.is_empty(),

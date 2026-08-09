@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Language tags for `.kt`/`.kts` (Kotlin) and `.gradle` (Groovy). Neither has a tree-sitter grammar
+  here, so neither gains a structural graph — but before this they were in no branch of
+  `lang::from_path` at all, which meant they were dropped *before chunking*: a Kotlin Spring Boot
+  service produced no chunks, no embeddings and no semantic-search hits, not merely no graph. It was
+  invisible to this crate end to end. With a tag they take the windowed-text fallback like `.go` and
+  `.c` already do. `lang::has_graph("kotlin")` is deliberately `false`, and there is a test asserting
+  it: a language tag is not a claim of structural extraction, and conflating the two is precisely the
+  overstatement this change is careful not to make.
+
 - Source-agnostic indexing core (`src/input.rs`, ADR-0086): `RawInput` (a logical path plus bytes,
   with an optional explicit `language` override), `IndexOptions`, a push-based `Indexer`
   (`new`/`push`/`record_pruned`/`finish`), and the `index_inputs(iter, &options)` convenience. A
