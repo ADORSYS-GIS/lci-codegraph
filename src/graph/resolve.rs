@@ -24,7 +24,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use lci_codegraph_model::FrameworkFacts;
+use lci_codegraph_model::{FrameworkFacts, ResolveStats};
 
 use super::{Callable, FileSymbols, Graph, GraphEdge, GraphNode};
 
@@ -85,14 +85,21 @@ fn pick<'a>(candidates: Option<&[&'a Callable]>, qualifier: Option<&str>) -> Pic
 }
 
 /// Resolve every file's call sites into `calls` edges with cross-file resolution, merge in whatever a
-/// framework extractor contributed, and return the canonicalised whole-repo [`Graph`].
+/// framework extractor contributed, and return the canonicalised whole-repo [`Graph`] alongside the
+/// [`ResolveStats`] counted while resolving.
 ///
 /// `framework` is one [`FrameworkFacts`] per file a caller ran a framework extractor over (today:
 /// Java files, via `lci-codegraph-spring` — see `src/input.rs`). An empty vec reproduces this
 /// function's pre-framework behaviour exactly: every non-Java caller, and every Java repo nothing
 /// framework-specific was extracted for, is unaffected by construction, not by a flag.
+///
+/// The returned [`ResolveStats`] is the denominator this module used to only ever log
+/// (`tracing::debug!`, still emitted below): `calls_resolved` is counted as `calls` edges are pushed
+/// during resolution, not derived from the graph's final deduped edge count — identical duplicate call
+/// sites collapse into one edge during canonicalisation, so a post-dedup count would understate the
+/// call sites actually processed.
 #[must_use]
-pub fn resolve(files: Vec<FileSymbols>, framework: Vec<FrameworkFacts>) -> Graph {
+pub fn resolve(files: Vec<FileSymbols>, framework: Vec<FrameworkFacts>) -> (Graph, ResolveStats) {
     // Framework call targets, converted once into the same `Callable` shape the language-level
     // resolver already matches candidates with. `FrameworkCallTarget::scope`/`scope_supers` mirror
     // `Callable`'s fields exactly (see both types' doc comments), so `pick`'s qualifier matching
@@ -130,6 +137,7 @@ pub fn resolve(files: Vec<FileSymbols>, framework: Vec<FrameworkFacts>) -> Graph
 
     let mut nodes: Vec<GraphNode> = Vec::new();
     let mut edges: Vec<GraphEdge> = Vec::new();
+    let mut resolved = 0usize;
     let mut ambiguous = 0usize;
     let mut unresolved = 0usize;
 
@@ -172,6 +180,10 @@ pub fn resolve(files: Vec<FileSymbols>, framework: Vec<FrameworkFacts>) -> Graph
                 }
             };
             if let Some(target) = target {
+                // Counted here, as the edge is pushed — not derived from `edges.len()` after the
+                // dedup pass below, which would understate resolved call sites whenever two identical
+                // call sites (`helper(); helper();`) collapse into a single edge.
+                resolved += 1;
                 edges.push(GraphEdge {
                     source: call.caller.clone(),
                     target,
@@ -202,6 +214,7 @@ pub fn resolve(files: Vec<FileSymbols>, framework: Vec<FrameworkFacts>) -> Graph
     tracing::debug!(
         nodes = nodes.len(),
         edges = edges.len(),
+        resolved_calls = resolved,
         ambiguous_calls = ambiguous,
         unresolved_calls = unresolved,
         framework_nodes = framework_node_count,
@@ -209,7 +222,13 @@ pub fn resolve(files: Vec<FileSymbols>, framework: Vec<FrameworkFacts>) -> Graph
         "codegraph: resolved structural graph"
     );
 
-    Graph { nodes, edges }
+    let stats = ResolveStats {
+        calls_resolved: resolved,
+        calls_ambiguous: ambiguous,
+        calls_unresolved: unresolved,
+    };
+
+    (Graph { nodes, edges }, stats)
 }
 
 /// Collapse any `GraphNode`s that still share a `node_id` after the natural sort, keeping exactly
@@ -278,7 +297,7 @@ mod tests {
     /// `resolve` with an empty `framework` vec — every test below predates `FrameworkFacts` and
     /// exercises the language-only path, so this keeps the churn from the signature change to one
     /// line per call site rather than a `Vec::new()` repeated at every call.
-    fn resolve_no_framework(files: Vec<FileSymbols>) -> Graph {
+    fn resolve_no_framework(files: Vec<FileSymbols>) -> (Graph, ResolveStats) {
         resolve(files, Vec::new())
     }
 
@@ -435,12 +454,16 @@ mod tests {
                 qualifier: None,
             });
         }
-        let g = resolve_no_framework(vec![fs]);
+        let (g, stats) = resolve_no_framework(vec![fs]);
         let calls: Vec<_> = g.edges.iter().filter(|e| e.relation == "calls").collect();
         assert_eq!(
             calls.len(),
             1,
             "duplicate identical call sites must dedup to one edge; got {calls:?}"
+        );
+        assert_eq!(
+            stats.calls_resolved, 2,
+            "both call sites were resolved and counted BEFORE dedup collapsed them to one edge"
         );
     }
 
@@ -462,7 +485,7 @@ mod tests {
         fs.nodes.push(n_b.clone());
         fs.nodes.push(n_a.clone());
         fs.nodes.push(n_b.clone()); // duplicate, out of order
-        let g = resolve_no_framework(vec![fs]);
+        let (g, _stats) = resolve_no_framework(vec![fs]);
         assert_eq!(
             g.nodes,
             vec![n_a, n_b],
@@ -486,12 +509,66 @@ mod tests {
             name: "nowhere_defined".to_string(),
             qualifier: None,
         });
-        let g = resolve_no_framework(vec![fs]);
+        let (g, stats) = resolve_no_framework(vec![fs]);
         assert!(
             !g.edges.iter().any(|e| e.relation == "calls"),
             "an unresolvable callee must not produce a calls edge; got {:?}",
             g.edges
         );
+        assert_eq!(stats.calls_unresolved, 1);
+        assert_eq!(
+            stats.calls_ambiguous, 0,
+            "a call with no candidate anywhere must count as unresolved, never ambiguous"
+        );
+    }
+
+    #[test]
+    fn resolve_stats_reports_full_resolution_when_every_call_resolves() {
+        // A repo where every recorded call site resolves cleanly: no ambiguity, nothing unresolved,
+        // and `resolution_rate()` reads exactly 1.0 — the "this resolver did its job perfectly" case.
+        let mut fs = FileSymbols::default();
+        fs.callables.push(callable("helper", "f.rs#1:helper", None));
+        fs.calls.push(CallSite {
+            caller: "f.rs#2:caller".to_string(),
+            name: "helper".to_string(),
+            qualifier: None,
+        });
+        let (_g, stats) = resolve_no_framework(vec![fs]);
+        assert_eq!(stats.calls_resolved, 1);
+        assert_eq!(stats.calls_ambiguous, 0);
+        assert_eq!(stats.calls_unresolved, 0);
+        assert_eq!(stats.resolution_rate(), 1.0);
+    }
+
+    #[test]
+    fn resolve_stats_counts_a_genuine_ambiguity_as_ambiguous_not_unresolved() {
+        // Two same-named candidates in two OTHER files, and a caller in a THIRD file with no local
+        // "run" of its own — so the local table can't single either one out, and the global table's
+        // two same-named, unqualified candidates are a genuine ambiguity. This must land in
+        // `calls_ambiguous`, and specifically NOT in `calls_unresolved`: the two buckets exist
+        // precisely so an ambiguous call (a resolver-quality signal) is never conflated with a call to
+        // something that doesn't exist anywhere (expected, e.g. a third-party call).
+        let mut fs_a = FileSymbols::default();
+        fs_a.callables
+            .push(callable("run", "a.rs#1:run", Some("A")));
+        let mut fs_b = FileSymbols::default();
+        fs_b.callables
+            .push(callable("run", "b.rs#1:run", Some("B")));
+        let mut fs_c = FileSymbols::default();
+        fs_c.calls.push(CallSite {
+            caller: "c.rs#1:caller".to_string(),
+            name: "run".to_string(),
+            qualifier: None,
+        });
+        let (g, stats) = resolve_no_framework(vec![fs_a, fs_b, fs_c]);
+        assert!(
+            !g.edges.iter().any(|e| e.relation == "calls"),
+            "an ambiguous call must not produce a calls edge; got {:?}",
+            g.edges
+        );
+        assert_eq!(stats.calls_ambiguous, 1);
+        assert_eq!(stats.calls_unresolved, 0);
+        assert_eq!(stats.calls_resolved, 0);
     }
 
     // ── FrameworkFacts merge ────────────────────────────────────────────────────────────────────
@@ -518,7 +595,7 @@ mod tests {
             }],
             call_targets: vec![],
         };
-        let g = resolve(vec![FileSymbols::default()], vec![facts]);
+        let (g, _stats) = resolve(vec![FileSymbols::default()], vec![facts]);
         assert!(
             g.nodes
                 .iter()
@@ -557,7 +634,7 @@ mod tests {
                 scope_supers: vec!["CrudRepository".to_string()],
             }],
         };
-        let g = resolve(vec![fs], vec![facts]);
+        let (g, stats) = resolve(vec![fs], vec![facts]);
         assert!(
             g.edges.iter().any(|e| e.relation == "calls"
                 && e.source == "AccountServiceImpl.java#1:findByEmail"
@@ -565,6 +642,7 @@ mod tests {
             "call site must resolve to the framework call target; edges = {:?}",
             g.edges
         );
+        assert_eq!(stats.calls_resolved, 1);
     }
 
     #[test]
@@ -593,7 +671,7 @@ mod tests {
                 scope_supers: vec![],
             }],
         };
-        let g = resolve(vec![fs], vec![facts]);
+        let (g, _stats) = resolve(vec![fs], vec![facts]);
         let targets: Vec<_> = g
             .edges
             .iter()
@@ -699,7 +777,7 @@ mod tests {
             edges: vec![],
             call_targets: vec![],
         };
-        let g = resolve(
+        let (g, _stats) = resolve(
             vec![FileSymbols::default(), FileSymbols::default()],
             vec![facts_a, facts_b],
         );

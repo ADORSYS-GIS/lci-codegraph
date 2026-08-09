@@ -1,0 +1,337 @@
+{
+  "apps": {
+    "axum-service-rust": {
+      "files": {
+        "files_total": 5,
+        "files_chunked": 5,
+        "files_skipped_unsupported": 0,
+        "files_graphable": 4
+      },
+      "graph": {
+        "nodes": 24,
+        "edges": 27,
+        "calls_edges": 7,
+        "route_nodes": 0,
+        "external_service_nodes": 0
+      },
+      "resolution": {
+        "calls_resolved": 7,
+        "calls_ambiguous": 4,
+        "calls_unresolved": 27,
+        "resolution_rate": 0.18421052631578946
+      },
+      "languages": {
+        "rust": {
+          "files": 4,
+          "has_grammar": true,
+          "has_graph": true,
+          "graph_nodes": 24,
+          "graph_files": 4
+        },
+        "text": {
+          "files": 1,
+          "has_grammar": false,
+          "has_graph": false,
+          "graph_nodes": 0,
+          "graph_files": 0
+        }
+      },
+      "file_coverage": 1.0,
+      "framework_coverage": 0
+    },
+    "fastapi-service-python": {
+      "files": {
+        "files_total": 5,
+        "files_chunked": 4,
+        "files_skipped_unsupported": 0,
+        "files_graphable": 4
+      },
+      "graph": {
+        "nodes": 18,
+        "edges": 21,
+        "calls_edges": 7,
+        "route_nodes": 0,
+        "external_service_nodes": 0
+      },
+      "resolution": {
+        "calls_resolved": 7,
+        "calls_ambiguous": 0,
+        "calls_unresolved": 4,
+        "resolution_rate": 0.6363636363636364
+      },
+      "languages": {
+        "python": {
+          "files": 4,
+          "has_grammar": true,
+          "has_graph": true,
+          "graph_nodes": 18,
+          "graph_files": 4
+        },
+        "text": {
+          "files": 1,
+          "has_grammar": false,
+          "has_graph": false,
+          "graph_nodes": 0,
+          "graph_files": 0
+        }
+      },
+      "file_coverage": 1.0,
+      "framework_coverage": 0
+    },
+    "keycloak-spi-java": {
+      "files": {
+        "files_total": 6,
+        "files_chunked": 4,
+        "files_skipped_unsupported": 2,
+        "files_graphable": 4
+      },
+      "graph": {
+        "nodes": 20,
+        "edges": 20,
+        "calls_edges": 4,
+        "route_nodes": 0,
+        "external_service_nodes": 0
+      },
+      "resolution": {
+        "calls_resolved": 4,
+        "calls_ambiguous": 0,
+        "calls_unresolved": 7,
+        "resolution_rate": 0.36363636363636365
+      },
+      "languages": {
+        "java": {
+          "files": 4,
+          "has_grammar": true,
+          "has_graph": true,
+          "graph_nodes": 20,
+          "graph_files": 4
+        }
+      },
+      "file_coverage": 1.0,
+      "framework_coverage": 0
+    },
+    "nestjs-service-typescript": {
+      "files": {
+        "files_total": 7,
+        "files_chunked": 7,
+        "files_skipped_unsupported": 0,
+        "files_graphable": 5
+      },
+      "graph": {
+        "nodes": 19,
+        "edges": 20,
+        "calls_edges": 6,
+        "route_nodes": 0,
+        "external_service_nodes": 0
+      },
+      "resolution": {
+        "calls_resolved": 6,
+        "calls_ambiguous": 1,
+        "calls_unresolved": 12,
+        "resolution_rate": 0.3157894736842105
+      },
+      "languages": {
+        "text": {
+          "files": 2,
+          "has_grammar": false,
+          "has_graph": false,
+          "graph_nodes": 0,
+          "graph_files": 0
+        },
+        "typescript": {
+          "files": 5,
+          "has_grammar": true,
+          "has_graph": true,
+          "graph_nodes": 19,
+          "graph_files": 5
+        }
+      },
+      "file_coverage": 1.0,
+      "framework_coverage": 0
+    },
+    "spring-boot-gradle-java": {
+      "files": {
+        "files_total": 9,
+        "files_chunked": 9,
+        "files_skipped_unsupported": 0,
+        "files_graphable": 7
+      },
+      "graph": {
+        "nodes": 40,
+        "edges": 40,
+        "calls_edges": 13,
+        "route_nodes": 6,
+        "external_service_nodes": 0
+      },
+      "resolution": {
+        "calls_resolved": 7,
+        "calls_ambiguous": 0,
+        "calls_unresolved": 4,
+        "resolution_rate": 0.6363636363636364
+      },
+      "languages": {
+        "groovy": {
+          "files": 2,
+          "has_grammar": false,
+          "has_graph": false,
+          "graph_nodes": 0,
+          "graph_files": 0
+        },
+        "java": {
+          "files": 7,
+          "has_grammar": true,
+          "has_graph": true,
+          "graph_nodes": 40,
+          "graph_files": 7
+        }
+      },
+      "file_coverage": 1.0,
+      "framework_coverage": 6
+    },
+    "spring-boot-gradle-kotlin": {
+      "files": {
+        "files_total": 6,
+        "files_chunked": 6,
+        "files_skipped_unsupported": 0,
+        "files_graphable": 0
+      },
+      "graph": {
+        "nodes": 0,
+        "edges": 0,
+        "calls_edges": 0,
+        "route_nodes": 0,
+        "external_service_nodes": 0
+      },
+      "resolution": {
+        "calls_resolved": 0,
+        "calls_ambiguous": 0,
+        "calls_unresolved": 0,
+        "resolution_rate": 0.0
+      },
+      "languages": {
+        "kotlin": {
+          "files": 6,
+          "has_grammar": false,
+          "has_graph": false,
+          "graph_nodes": 0,
+          "graph_files": 0
+        }
+      },
+      "file_coverage": null,
+      "framework_coverage": 0
+    },
+    "spring-boot-maven-java": {
+      "files": {
+        "files_total": 8,
+        "files_chunked": 7,
+        "files_skipped_unsupported": 1,
+        "files_graphable": 7
+      },
+      "graph": {
+        "nodes": 47,
+        "edges": 47,
+        "calls_edges": 13,
+        "route_nodes": 5,
+        "external_service_nodes": 1
+      },
+      "resolution": {
+        "calls_resolved": 8,
+        "calls_ambiguous": 0,
+        "calls_unresolved": 6,
+        "resolution_rate": 0.5714285714285714
+      },
+      "languages": {
+        "java": {
+          "files": 7,
+          "has_grammar": true,
+          "has_graph": true,
+          "graph_nodes": 47,
+          "graph_files": 7
+        }
+      },
+      "file_coverage": 1.0,
+      "framework_coverage": 6
+    }
+  },
+  "languages": {
+    "groovy": {
+      "has_grammar": false,
+      "has_graph": false,
+      "framework_pass": false
+    },
+    "java": {
+      "has_grammar": true,
+      "has_graph": true,
+      "framework_pass": true
+    },
+    "kotlin": {
+      "has_grammar": false,
+      "has_graph": false,
+      "framework_pass": false
+    },
+    "python": {
+      "has_grammar": true,
+      "has_graph": true,
+      "framework_pass": false
+    },
+    "rust": {
+      "has_grammar": true,
+      "has_graph": true,
+      "framework_pass": false
+    },
+    "text": {
+      "has_grammar": false,
+      "has_graph": false,
+      "framework_pass": false
+    },
+    "typescript": {
+      "has_grammar": true,
+      "has_graph": true,
+      "framework_pass": false
+    }
+  },
+  "adoption_summary": {
+    "groovy": {
+      "apps": 1,
+      "call_resolution_rate": 0.0,
+      "call_sites": 0,
+      "file_coverage": null
+    },
+    "java": {
+      "apps": 3,
+      "call_resolution_rate": 0.5277777777777778,
+      "call_sites": 36,
+      "file_coverage": 1.0
+    },
+    "kotlin": {
+      "apps": 1,
+      "call_resolution_rate": 0.0,
+      "call_sites": 0,
+      "file_coverage": null
+    },
+    "python": {
+      "apps": 1,
+      "call_resolution_rate": 0.6363636363636364,
+      "call_sites": 11,
+      "file_coverage": 1.0
+    },
+    "rust": {
+      "apps": 1,
+      "call_resolution_rate": 0.18421052631578946,
+      "call_sites": 38,
+      "file_coverage": 1.0
+    },
+    "text": {
+      "apps": 3,
+      "call_resolution_rate": 0.0,
+      "call_sites": 0,
+      "file_coverage": null
+    },
+    "typescript": {
+      "apps": 1,
+      "call_resolution_rate": 0.3157894736842105,
+      "call_sites": 19,
+      "file_coverage": 1.0
+    }
+  }
+}

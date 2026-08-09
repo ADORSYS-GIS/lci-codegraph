@@ -15,7 +15,7 @@
 
 use std::borrow::Cow;
 
-use lci_codegraph_model::FrameworkFacts;
+use lci_codegraph_model::{FrameworkFacts, ResolveStats};
 
 use crate::chunk::{self, Chunk};
 use crate::graph::{self, FileSymbols, Graph};
@@ -100,7 +100,7 @@ pub struct IndexOptions {
 
 /// Counters for one indexing run. Logged so a too-broad ignore glob (or a PDF-heavy source) is
 /// diagnosable.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, serde::Serialize)]
 pub struct IndexStats {
     pub files_chunked: usize,
     /// Inputs the reader pruned before they ever reached [`Indexer::push`] — e.g. `FsSource` pruning a
@@ -139,6 +139,19 @@ pub struct IndexStats {
     /// caller-supplied batch size, so a too-small batch shows up here as a suspiciously high count.
     /// Stays `0` for the same reason as `chunks_embedded`.
     pub embed_batches: usize,
+    /// Call sites [`graph::resolve`] matched to exactly one candidate and emitted a `calls` edge for
+    /// — the `calls_resolved` bucket of the run's [`ResolveStats`], see that type's own doc comment
+    /// for the full accounting. Stays `0` when [`IndexOptions::build_graph`] is `false`, since
+    /// `resolve` never runs — that is "resolution never happened," not "every call site failed to
+    /// resolve," so a zero here on a graph-less run must not be read as a resolution-quality signal.
+    pub calls_resolved: usize,
+    /// Call sites dropped as genuinely ambiguous (several same-named candidates, no qualifier singled
+    /// one out) — see [`ResolveStats::calls_ambiguous`]. Stays `0` when `build_graph` is `false`, for
+    /// the same reason as `calls_resolved` above.
+    pub calls_ambiguous: usize,
+    /// Call sites with no matching candidate anywhere — see [`ResolveStats::calls_unresolved`]. Stays
+    /// `0` when `build_graph` is `false`, for the same reason as `calls_resolved` above.
+    pub calls_unresolved: usize,
 }
 
 /// The output of an indexing run: chunks to embed and the resolved structural graph.
@@ -293,10 +306,23 @@ impl Indexer {
 
     /// Resolve the cross-file graph and return everything collected so far.
     #[must_use]
-    pub fn finish(self) -> IndexOutput {
+    pub fn finish(mut self) -> IndexOutput {
         let graph = if self.options.build_graph {
-            graph::resolve(self.file_symbols, self.framework_facts)
+            let (graph, resolve_stats) = graph::resolve(self.file_symbols, self.framework_facts);
+            let ResolveStats {
+                calls_resolved,
+                calls_ambiguous,
+                calls_unresolved,
+            } = resolve_stats;
+            self.stats.calls_resolved = calls_resolved;
+            self.stats.calls_ambiguous = calls_ambiguous;
+            self.stats.calls_unresolved = calls_unresolved;
+            graph
         } else {
+            // `graph::resolve` never runs — every `ResolveStats` field, and therefore every mirrored
+            // `IndexStats` field, stays at its `Default` of `0`. See the doc comments on
+            // `calls_resolved`/`calls_ambiguous`/`calls_unresolved` above: this is "resolution never
+            // happened," not "every call site failed to resolve."
             Graph::default()
         };
 
@@ -305,6 +331,9 @@ impl Indexer {
             chunks = self.chunks.len(),
             graph_nodes = graph.nodes.len(),
             graph_edges = graph.edges.len(),
+            calls_resolved = self.stats.calls_resolved,
+            calls_ambiguous = self.stats.calls_ambiguous,
+            calls_unresolved = self.stats.calls_unresolved,
             paths_ignored = self.stats.paths_ignored,
             files_skipped_binary = self.stats.files_skipped_binary,
             files_skipped_too_large = self.stats.files_skipped_too_large,
@@ -620,6 +649,36 @@ mod tests {
         assert!(out.graph.edges.is_empty(), "graph off ⇒ no edges");
     }
 
+    #[test]
+    fn build_graph_false_leaves_every_resolve_counter_at_zero() {
+        // `graph::resolve` never runs when the graph is off, so none of the three call-resolution
+        // counters can move — even though the input below has a call site that WOULD resolve if the
+        // graph were built. This is "resolution never happened," not "every call site failed to
+        // resolve": a caller must not read this zero as a resolution-quality signal.
+        let mut indexer = Indexer::new(IndexOptions::builder().build_graph(false).build());
+        indexer.push(RawInput::text("src/a.rs", "fn caller() { target(); }\n"));
+        indexer.push(RawInput::text("src/b.rs", "fn target() {}\n"));
+        let stats = indexer.finish().stats;
+
+        assert_eq!(stats.calls_resolved, 0);
+        assert_eq!(stats.calls_ambiguous, 0);
+        assert_eq!(stats.calls_unresolved, 0);
+    }
+
+    #[test]
+    fn build_graph_true_carries_the_resolvers_call_resolution_counters_into_index_stats() {
+        // The companion to the test above: with the graph on, `IndexStats` must actually carry
+        // `graph::resolve`'s `ResolveStats` through, not just leave the fields present-but-unused.
+        let mut indexer = Indexer::new(IndexOptions::builder().build_graph(true).build());
+        indexer.push(RawInput::text("src/a.rs", "fn caller() { target(); }\n"));
+        indexer.push(RawInput::text("src/b.rs", "fn target() {}\n"));
+        let stats = indexer.finish().stats;
+
+        assert_eq!(stats.calls_resolved, 1);
+        assert_eq!(stats.calls_ambiguous, 0);
+        assert_eq!(stats.calls_unresolved, 0);
+    }
+
     // ── index_inputs vs. driving Indexer manually ───────────────────────────────────────────────────
 
     #[test]
@@ -726,6 +785,9 @@ mod tests {
         assert_eq!(out.stats.files_skipped_binary, 0);
         assert_eq!(out.stats.files_skipped_too_large, 0);
         assert_eq!(out.stats.files_skipped_unsupported, 0);
+        assert_eq!(out.stats.calls_resolved, 0);
+        assert_eq!(out.stats.calls_ambiguous, 0);
+        assert_eq!(out.stats.calls_unresolved, 0);
     }
 
     #[test]

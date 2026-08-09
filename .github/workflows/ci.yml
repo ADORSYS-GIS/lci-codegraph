@@ -90,6 +90,26 @@ jobs:
       - name: cargo test --doc
         run: cargo test --workspace --locked --doc
 
+      # The example-gallery coverage matrix (tests/examples_metrics.rs) is warn-only by design: it
+      # never fails a run over metric drift, only over a genuine harness error (a missing/unparseable
+      # examples/metrics.json, or a walk that errors) — see that file's own module doc for why, and
+      # what that tradeoff costs. This step is the actual mitigation for the cost: it puts the
+      # coverage/drift table in front of every PR on the run's own summary page, instead of leaving it
+      # buried in `--nocapture` log output nobody scrolls to. `if: always()` so the table still shows
+      # up even when an earlier step already failed the job, and `|| true` on the piped command so
+      # this reporting step itself can never be what fails the job — the real correctness gate is the
+      # `cargo test (lib + integration)` step above, which already runs this same test as part of
+      # `--all-targets` and fails on a genuine harness error there.
+      - name: examples coverage matrix
+        if: always()
+        run: |
+          {
+            echo '## Example coverage matrix'
+            echo '```'
+            cargo test --workspace --locked --test examples_metrics -- --nocapture 2>&1 | sed -n '/BEGIN MATRIX/,/END MATRIX/p' || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   msrv:
     name: msrv
     runs-on: ubuntu-latest

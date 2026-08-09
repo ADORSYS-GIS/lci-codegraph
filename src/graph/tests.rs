@@ -17,7 +17,10 @@ fn graph_of_lang(language: &str, files: &[(&str, &str)]) -> Graph {
     // No framework facts here: this module drives `extract_file`/`resolve` directly to test the
     // language-level pipeline in isolation. `lci-codegraph-spring` is wired in at the `Indexer`
     // level (`src/input.rs`), not here — see `tests/language_goldens.rs` for the end-to-end path.
-    resolve(facts, Vec::new())
+    // Only the graph is interesting to this file's tests — the resolve stats are exercised directly
+    // in `graph::resolve`'s own unit tests.
+    let (graph, _stats) = resolve(facts, Vec::new());
+    graph
 }
 
 fn graph_of(files: &[(&str, &str)]) -> Graph {
