@@ -3,6 +3,14 @@
 This repository follows the [ADORSYS-GIS AI Governance](https://adorsys-gis.github.io/ai-governance/) discipline:
 **AI may accelerate the work, but humans own intent, verification, and consequences.**
 
+## Before you change anything
+
+Read **[AGENTS.md](AGENTS.md)** — the working rules for this repository, for humans and AI agents
+alike. It covers the verification discipline this crate depends on (goldens are regenerated, never
+hand-edited; a green suite is evidence about the tests that exist, not about your change), the
+resolver's precision-favouring policy, where framework knowledge is allowed to live, and the
+workspace-wide cargo invocations that plain `cargo test` silently skips.
+
 ## How to contribute
 
 - **Open issues** with the structured forms — [Epic](.github/ISSUE_TEMPLATE/epic.yml),
