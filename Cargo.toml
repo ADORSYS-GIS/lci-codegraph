@@ -71,7 +71,15 @@ autoexamples = false
 # `/examples/apps` holds the sample applications the extractor is demonstrated against — several
 # megabytes of Java/Kotlin/TypeScript/Python source that a consumer of the published crate has no
 # use for. They stay in the repository (and in `tests/examples.rs`) but out of the `.crate` file.
-exclude = ["/.github", "/docs", "/tests/fixtures/real-repos", "/examples/apps"]
+exclude = [
+    "/.github",
+    "/docs",
+    "/tests/fixtures/real-repos",
+    "/examples/apps",
+    # Contributor process, not crate documentation — useful in the repository, noise in a `.crate`.
+    "/AGENTS.md",
+    "/CLAUDE.md",
+]
 
 [lib]
 path = "src/lib.rs"
