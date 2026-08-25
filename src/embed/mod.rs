@@ -82,9 +82,9 @@ impl EmbedConfig {
     /// switch that decides whether a walk embeds at all.
     ///
     /// Note there is deliberately no `OPENAI_EMBEDDING_BATCH_SIZE` here: batch size reuses the
-    /// **existing** [`crate::IndexTuning::embed_batch_size`] (`INDEX_EMBED_BATCH_SIZE`, default 32)
-    /// — that knob already exists for exactly this, and duplicating it would give two names for one
-    /// setting.
+    /// **existing** [`crate::IndexTuning::embed_batch_size`] (`LCI_CODEGRAPH_EMBED_BATCH_SIZE`,
+    /// default 32) — that knob already exists for exactly this, and duplicating it would give two
+    /// names for one setting.
     #[must_use]
     pub fn from_env() -> Option<Self> {
         Self::from_lookup(|key| std::env::var(key).ok())

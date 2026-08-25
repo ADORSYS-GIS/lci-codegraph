@@ -197,8 +197,9 @@ pub fn walk_checkout(root: &Path, options: &WalkOptions) -> anyhow::Result<Index
     Ok(output)
 }
 
-/// Convenience: walk reading tuning + operator ignore globs from the environment
-/// (`INDEX_*` and `LCI_CODEGRAPH_IGNORE_GLOBS`) — used by hosts that want env-driven config.
+/// Convenience: walk reading tuning + operator ignore globs from the environment (all under the
+/// `LCI_CODEGRAPH_` prefix, e.g. `LCI_CODEGRAPH_WINDOW_SIZE`, `LCI_CODEGRAPH_IGNORE_GLOBS`) — used by
+/// hosts that want env-driven config.
 pub fn walk_checkout_from_env(root: &Path, build_graph: bool) -> anyhow::Result<IndexOutput> {
     let options = WalkOptions::builder()
         .tuning(IndexTuning::from_env())
