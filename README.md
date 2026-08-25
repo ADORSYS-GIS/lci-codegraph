@@ -389,10 +389,10 @@ via `embed::embed_output`; see "Raw inputs: the filesystem is one reader" above)
 
 | Field | Env var | Default | Meaning |
 |---|---|---|---|
-| `embed_batch_size` | `INDEX_EMBED_BATCH_SIZE` | `32` | Chunks per embedding round-trip |
-| `max_chunk_lines` | `INDEX_MAX_CHUNK_LINES` | `150` | Max lines a structured chunk may span before falling back to windowing |
-| `window_size` | `INDEX_WINDOW_SIZE` | `100` | Windowed-fallback window size, in lines |
-| `window_step` | `INDEX_WINDOW_STEP` | `50` | Windowed-fallback step, in lines (overlap = `window_size - window_step`) |
+| `embed_batch_size` | `LCI_CODEGRAPH_EMBED_BATCH_SIZE` | `32` | Chunks per embedding round-trip |
+| `max_chunk_lines` | `LCI_CODEGRAPH_MAX_CHUNK_LINES` | `150` | Max lines a structured chunk may span before falling back to windowing |
+| `window_size` | `LCI_CODEGRAPH_WINDOW_SIZE` | `100` | Windowed-fallback window size, in lines |
+| `window_step` | `LCI_CODEGRAPH_WINDOW_STEP` | `50` | Windowed-fallback step, in lines (overlap = `window_size - window_step`) |
 
 [`walk_checkout_from_env(root, build_graph)`](https://docs.rs/lci-codegraph/latest/lci_codegraph/fn.walk_checkout_from_env.html)
 is a convenience that builds `WalkOptions` from the environment: `IndexTuning::from_env()` for
@@ -494,7 +494,7 @@ needs no key at all.
 | `OPENAI_EMBEDDING_MAX_INPUT_CHARS` | `EmbedConfig::max_input_chars` | `8000` | Each input is truncated to this many **chars** (not bytes) before being sent. Unparseable or `0` → default |
 
 There is deliberately no `OPENAI_EMBEDDING_BATCH_SIZE`: batch size reuses the **existing**
-`INDEX_EMBED_BATCH_SIZE` / `IndexTuning::embed_batch_size` knob (default 32, see
+`LCI_CODEGRAPH_EMBED_BATCH_SIZE` / `IndexTuning::embed_batch_size` knob (default 32, see
 [Configuration](#configuration)) rather than adding a second name for the same setting.
 `EmbedConfig::max_context_refs` (default `8`, the max callees and max callers listed in the context
 header, each side capped independently) has no environment variable — set it through the `EmbedConfig`

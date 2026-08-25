@@ -1,11 +1,12 @@
 //! Black-box test that [`walk_checkout_from_env`] actually honours the environment variables it
-//! documents (`INDEX_*` tuning knobs via [`lci_codegraph::IndexTuning::from_env`], and
+//! documents (`LCI_CODEGRAPH_*` tuning knobs via [`lci_codegraph::IndexTuning::from_env`], and
 //! `LCI_CODEGRAPH_IGNORE_GLOBS` for the operator ignore layer).
 //!
 //! All env mutation happens inside ONE test function, sequentially, with every variable restored in
 //! a `finally`-style guard — `cargo test` runs tests in a single process by default and Rust test
-//! threads share the process environment, so setting `INDEX_WINDOW_SIZE` (etc.) from more than one
-//! test function would race. No new dependency is pulled in for this; a plain guard struct is enough.
+//! threads share the process environment, so setting `LCI_CODEGRAPH_WINDOW_SIZE` (etc.) from more than
+//! one test function would race. No new dependency is pulled in for this; a plain guard struct is
+//! enough.
 
 mod common;
 
@@ -61,8 +62,8 @@ fn walk_checkout_from_env_honours_index_tuning_and_ignore_glob_env_vars() {
     common::write(root, "hidden.txt", "do not index me\n");
 
     let guard = EnvGuard::set(&[
-        ("INDEX_WINDOW_SIZE", "2"),
-        ("INDEX_WINDOW_STEP", "1"),
+        ("LCI_CODEGRAPH_WINDOW_SIZE", "2"),
+        ("LCI_CODEGRAPH_WINDOW_STEP", "1"),
         ("LCI_CODEGRAPH_IGNORE_GLOBS", "hidden.txt"),
     ]);
 
@@ -75,8 +76,8 @@ fn walk_checkout_from_env_honours_index_tuning_and_ignore_glob_env_vars() {
         .collect();
     assert!(
         notes_chunks.len() > 1,
-        "INDEX_WINDOW_SIZE=2 must shrink the window enough to split a 6-line file into more than \
-         one chunk; got {notes_chunks:?}"
+        "LCI_CODEGRAPH_WINDOW_SIZE=2 must shrink the window enough to split a 6-line file into more \
+         than one chunk; got {notes_chunks:?}"
     );
 
     assert!(
