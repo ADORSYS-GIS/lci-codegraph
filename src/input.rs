@@ -285,7 +285,7 @@ impl Indexer {
                 } else {
                     // Windowed/fallback chunks (the branch above) never correspond 1:1 with a
                     // definition, so linking is only attempted for structurally-chunked output —
-                    // see `link_chunk_node_ids`'s own doc comment (issue #12).
+                    // see `link_chunk_node_ids`'s own doc comment.
                     link_chunk_node_ids(&path, &file_symbols, &mut cs);
                 }
                 self.file_symbols.push(file_symbols);
@@ -357,12 +357,13 @@ impl Indexer {
 }
 
 /// Join each of one file's just-computed chunks to the graph node it is the body of, when one
-/// exists (issue #12). Computes the same id [`graph::extract_file`] would have emitted for a
-/// definition at this exact `(path, start_line, name-or-kind)` — the same name-or-kind fallback
-/// rule both `chunk::interesting_node` and the graph's own node emission use — and only accepts it
-/// if that id is actually present among `file_symbols`' just-emitted nodes for this file. Never a
-/// guess from a naming convention alone: a candidate that doesn't exist in the real node set (the
-/// exact gap issues #10/#11 document — a chunk with no matching def, or vice versa) is left `None`.
+/// exists. Computes the same id [`graph::extract_file`] would have emitted for a definition at
+/// this exact `(path, start_line, name-or-kind)` — the same name-or-kind fallback rule both
+/// `chunk::interesting_node` and the graph's own node emission use — and only accepts it if that id
+/// is actually present among `file_symbols`' just-emitted nodes for this file. Never a guess from a
+/// naming convention alone: a candidate that doesn't exist in the real node set (the chunker and the
+/// graph builder disagreeing on a symbol, or one having no match in the other at all) is left
+/// `None`.
 fn link_chunk_node_ids(path: &str, file_symbols: &FileSymbols, chunks: &mut [Chunk]) {
     let nodes = file_symbols.nodes();
     for chunk in chunks {

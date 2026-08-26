@@ -28,10 +28,10 @@ pub struct Chunk {
     pub end_line: i32,
     pub content: String,
     /// The graph node this chunk is the body of, when the walk built a graph (`build_graph: true`)
-    /// and this chunk corresponds to a definition the graph pass also found in the same parse
-    /// (issue #12). `None` for windowed chunks, PDF text, a `build_graph: false` walk, and any chunk
-    /// with no matching definition node — never a guess: it is only ever set to an id that was
-    /// verified to exist in this file's own graph facts, not reconstructed from a naming convention.
+    /// and this chunk corresponds to a definition the graph pass also found in the same parse.
+    /// `None` for windowed chunks, PDF text, a `build_graph: false` walk, and any chunk with no
+    /// matching definition node — never a guess: it is only ever set to an id that was verified to
+    /// exist in this file's own graph facts, not reconstructed from a naming convention.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub node_id: Option<String>,
     /// The embedding vector, set by `embed::embed_chunks` once this chunk is configured to be

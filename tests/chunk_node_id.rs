@@ -1,6 +1,6 @@
-//! Black-box tests for [`Chunk::node_id`] (issue #12): each chunk derived from a definition the graph
-//! pass also found is linked to that definition's node id, computed and verified inside the crate from
-//! the same per-file facts — never guessed by an external caller reconstructing a naming convention.
+//! Black-box tests for [`Chunk::node_id`]: each chunk derived from a definition the graph pass also
+//! found is linked to that definition's node id, computed and verified inside the crate from the
+//! same per-file facts — never guessed by an external caller reconstructing a naming convention.
 //!
 //! Determinism (two walks of the same checkout produce identical `node_id` assignments) is already
 //! covered by `tests/determinism.rs`'s `same_checkout_walked_twice_is_byte_identical`, which compares
@@ -124,8 +124,8 @@ fn node_id_is_none_for_a_chunk_with_no_matching_definition() {
     // (`chunk::interesting_node`'s `variable_declarator` arm returns `None`, so `arrow_function`
     // yields `("function", None)` — no name reaches the chunk), while the tags-driven graph pass DOES
     // recover the binding's name. The computed candidate id (keyed on the chunk's own, name-less
-    // fallback) therefore cannot exist in the real node set — documented behaviour (issue #11), not a
-    // bug #12 introduces: `None` is the only honest answer here, not a guess.
+    // fallback) therefore cannot exist in the real node set: `None` is the only honest answer here,
+    // not a guess.
     let options = IndexOptions::builder().build_graph(true).build();
     let out = index_inputs(
         vec![RawInput::text(

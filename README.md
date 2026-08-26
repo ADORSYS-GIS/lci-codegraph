@@ -176,9 +176,8 @@ from a definition the graph pass also found in the same parse, `node_id: Option<
 [`GraphNode`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.GraphNode.html) it is the body
 of — populated inside the walk, from the same per-file facts, never reconstructed by the caller from a
 naming convention. It is `None` for a windowed/fallback chunk, for any walk with `build_graph: false`,
-and for a chunk whose definition the graph pass didn't independently discover under the same name (the
-chunk/graph symbol-set gaps [issues #10 and #11](https://github.com/ADORSYS-GIS/lci-codegraph/issues)
-document) — `None` is always the honest answer there, never a guess.
+and for a chunk whose definition the graph pass didn't independently discover under the same name —
+`None` is always the honest answer there, never a guess.
 
 Two more fields exist for the [semantic embeddings](#semantic-embeddings) step and stay `None` unless
 it runs: `embedding: Option<Vec<f32>>`, the vector returned by the embeddings endpoint, and
