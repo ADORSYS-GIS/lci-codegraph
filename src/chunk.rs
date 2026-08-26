@@ -27,6 +27,13 @@ pub struct Chunk {
     pub start_line: i32,
     pub end_line: i32,
     pub content: String,
+    /// The graph node this chunk is the body of, when the walk built a graph (`build_graph: true`)
+    /// and this chunk corresponds to a definition the graph pass also found in the same parse
+    /// (issue #12). `None` for windowed chunks, PDF text, a `build_graph: false` walk, and any chunk
+    /// with no matching definition node — never a guess: it is only ever set to an id that was
+    /// verified to exist in this file's own graph facts, not reconstructed from a naming convention.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_id: Option<String>,
     /// The embedding vector, set by `embed::embed_chunks` once this chunk is configured to be
     /// embedded. `None` for every chunk when embedding is off, or before the embed step runs.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -149,6 +156,7 @@ fn collect_items(
                     start_line,
                     end_line,
                     content: content.to_string(),
+                    node_id: None,
                     embedding: None,
                     embed_input: None,
                 });
@@ -170,6 +178,7 @@ fn collect_items(
                         start_line,
                         end_line,
                         content: content.to_string(),
+                        node_id: None,
                         embedding: None,
                         embed_input: None,
                     });
@@ -255,6 +264,7 @@ fn window_chunks(file_path: &str, source: &str, language: &str, tuning: IndexTun
             start_line: start as i32,
             end_line: (end - 1) as i32,
             content,
+            node_id: None,
             embedding: None,
             embed_input: None,
         });

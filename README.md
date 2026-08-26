@@ -171,12 +171,21 @@ Structured languages get tree-sitter-extracted items (functions, structs, classe
 everything else — or a file too large to parse, or a language with no grammar — falls back to
 fixed-size overlapping line windows.
 
+When a walk builds the graph (`build_graph: true`, see [Graph](#graph) below) and a chunk was derived
+from a definition the graph pass also found in the same parse, `node_id: Option<String>` names the
+[`GraphNode`](https://docs.rs/lci-codegraph/latest/lci_codegraph/struct.GraphNode.html) it is the body
+of — populated inside the walk, from the same per-file facts, never reconstructed by the caller from a
+naming convention. It is `None` for a windowed/fallback chunk, for any walk with `build_graph: false`,
+and for a chunk whose definition the graph pass didn't independently discover under the same name (the
+chunk/graph symbol-set gaps [issues #10 and #11](https://github.com/ADORSYS-GIS/lci-codegraph/issues)
+document) — `None` is always the honest answer there, never a guess.
+
 Two more fields exist for the [semantic embeddings](#semantic-embeddings) step and stay `None` unless
 it runs: `embedding: Option<Vec<f32>>`, the vector returned by the embeddings endpoint, and
 `embed_input: Option<String>`, the exact text that was (or would be) sent for it — the chunk's
-`content` plus a graph-aware header, truncated to the configured cap. Both are
-`#[serde(skip_serializing_if = "Option::is_none")]`, so JSON output is unchanged when embedding is
-off.
+`content` plus a graph-aware header, truncated to the configured cap. All three of `node_id`,
+`embedding` and `embed_input` are `#[serde(skip_serializing_if = "Option::is_none")]`, so JSON output
+is unchanged when a walk doesn't build the graph or doesn't embed.
 
 ### Graph
 

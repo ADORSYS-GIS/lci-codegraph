@@ -15,7 +15,7 @@
 
 use std::borrow::Cow;
 
-use lci_codegraph_model::{FrameworkFacts, ResolveStats};
+use lci_codegraph_model::{FrameworkFacts, ResolveStats, def_node_id};
 
 use crate::chunk::{self, Chunk};
 use crate::graph::{self, FileSymbols, Graph};
@@ -269,8 +269,7 @@ impl Indexer {
             // Parse ONCE and feed the chunker, the graph builder, and — Java only — the Spring
             // framework sibling pass, all off this one tree (ADR-0086 "parse once").
             if let Some(tree) = lang::parse(source, language) {
-                self.file_symbols
-                    .push(graph::extract_file(&tree, &path, source, language));
+                let file_symbols = graph::extract_file(&tree, &path, source, language);
                 // A sibling walk over the SAME tree `extract_file` just consumed, not a second
                 // parse — see `docs/architecture.md`'s one-parse section. Gated to Java only: this
                 // is the only language `lci-codegraph-spring` knows how to read annotations/
@@ -283,7 +282,13 @@ impl Indexer {
                 let mut cs = chunk::chunk_tree(&tree, &path, source, language, self.options.tuning);
                 if cs.is_empty() {
                     cs = chunk::chunk_text(&path, source, language, self.options.tuning);
+                } else {
+                    // Windowed/fallback chunks (the branch above) never correspond 1:1 with a
+                    // definition, so linking is only attempted for structurally-chunked output —
+                    // see `link_chunk_node_ids`'s own doc comment (issue #12).
+                    link_chunk_node_ids(&path, &file_symbols, &mut cs);
                 }
+                self.file_symbols.push(file_symbols);
                 cs
             } else {
                 chunk::chunk_file(&path, source, language, self.options.tuning)
@@ -347,6 +352,27 @@ impl Indexer {
             chunks: self.chunks,
             graph,
             stats: self.stats,
+        }
+    }
+}
+
+/// Join each of one file's just-computed chunks to the graph node it is the body of, when one
+/// exists (issue #12). Computes the same id [`graph::extract_file`] would have emitted for a
+/// definition at this exact `(path, start_line, name-or-kind)` — the same name-or-kind fallback
+/// rule both `chunk::interesting_node` and the graph's own node emission use — and only accepts it
+/// if that id is actually present among `file_symbols`' just-emitted nodes for this file. Never a
+/// guess from a naming convention alone: a candidate that doesn't exist in the real node set (the
+/// exact gap issues #10/#11 document — a chunk with no matching def, or vice versa) is left `None`.
+fn link_chunk_node_ids(path: &str, file_symbols: &FileSymbols, chunks: &mut [Chunk]) {
+    let nodes = file_symbols.nodes();
+    for chunk in chunks {
+        let key = chunk
+            .symbol_name
+            .as_deref()
+            .unwrap_or(chunk.chunk_type.as_str());
+        let candidate = def_node_id(path, i64::from(chunk.start_line) + 1, key);
+        if nodes.iter().any(|n| n.node_id == candidate) {
+            chunk.node_id = Some(candidate);
         }
     }
 }

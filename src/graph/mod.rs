@@ -94,6 +94,17 @@ pub struct FileSymbols {
     callables: Vec<Callable>,
 }
 
+impl FileSymbols {
+    /// This file's def nodes (including the file node itself). Read-only access for
+    /// [`crate::input::Indexer::push`], which joins each chunk to the graph node it is the body of
+    /// (issue #12) using the SAME per-file facts this file's chunks were just derived from in the
+    /// same parse — not a second, fuzzier lookup against the final resolved [`Graph`].
+    #[must_use]
+    pub(crate) fn nodes(&self) -> &[GraphNode] {
+        &self.nodes
+    }
+}
+
 /// A callable definition (`function`/`method`) recorded for call resolution.
 #[derive(Debug, Clone)]
 struct Callable {

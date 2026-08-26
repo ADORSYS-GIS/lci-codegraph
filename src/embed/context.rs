@@ -251,6 +251,7 @@ mod tests {
             start_line,
             end_line: start_line,
             content: "fn body() {}".to_string(),
+            node_id: None,
             embedding: None,
             embed_input: None,
         }
