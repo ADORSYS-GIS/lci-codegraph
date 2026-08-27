@@ -1,0 +1,51 @@
+// A CrateStack schema exercising every declaration kind the tags query
+// classifies: mixin (interface), enum, type/model/view (class), procedure
+// (function).
+//
+// Note what is deliberately absent: a call site. `.cstack` is declarative —
+// `publishPost` is declared here and implemented in Rust — so this fixture
+// pins that the language contributes definitions and zero `calls` edges.
+
+datasource db {
+  provider = "postgresql"
+}
+
+mixin Timestamps {
+  createdAt DateTime
+  updatedAt DateTime
+}
+
+enum Role {
+  Admin
+  Author
+  Reader
+}
+
+type PublishInput {
+  postId Int
+  notify Boolean
+}
+
+model User {
+  id Int @id
+  email String @unique
+  role Role
+  @use(Timestamps)
+}
+
+model Post {
+  id Int @id
+  title String
+  authorId Int
+  author User @relation(fields:[authorId],references:[id])
+  @use(Timestamps)
+}
+
+view PublishedPost from Post {
+  id Int
+  title String
+}
+
+procedure listAuthors(): User[]
+
+mutation procedure publishPost(args: PublishInput): Post
