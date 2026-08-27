@@ -125,6 +125,9 @@ tree-sitter-javascript = "0.25"
 tree-sitter-typescript = "0.23.2"
 tree-sitter-python = "0.25"
 tree-sitter-java = { workspace = true }
+# CrateStack `.cstack` schemas. Declarative, so this grammar contributes definitions
+# and no call sites — see `src/lang/cstack.rs` for why that is the language, not a gap.
+tree-sitter-cstack = "0.1"
 # ripgrep's ignore engine: honours the repo's own `.gitignore` AND lets us layer an
 # operator-configurable glob list on top with the SAME gitignore semantics (`GitignoreBuilder`).
 # This is how the crate *composes with* — rather than replaces — the repo ignores.

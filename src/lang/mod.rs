@@ -12,6 +12,7 @@
 //! tree (ADR-0086: "the tree is parsed once. Chunking, graph, and embedding-prep share one
 //! tree-sitter pass").
 
+mod cstack;
 mod java;
 mod javascript;
 mod python;
@@ -59,6 +60,7 @@ static REGISTRY: &[&dyn LanguageSupport] = &[
     &typescript::TypeScript,
     &typescript::Tsx,
     &java::Java,
+    &cstack::Cstack,
 ];
 
 /// All supported languages (those the crate ships a tree-sitter grammar for).

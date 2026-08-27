@@ -680,3 +680,61 @@ fn fixtures_have_no_embedded_git_dir() {
         );
     }
 }
+
+/// `.cstack` is the crate's first **declarative** language: it contributes definitions and, by
+/// construction, no call sites at all (a `procedure` is declared in the schema and implemented in
+/// Rust). This golden pins that shape — nodes without `calls` edges — so a future change that
+/// started inventing call edges here would show up as a diff rather than as a quietly wrong graph.
+#[test]
+fn cstack_repo_graph_matches_committed_golden() {
+    assert_matches_golden("cstack-repo");
+}
+
+/// AGENTS.md §4/§6: zero call sites is "there was nothing to try", not "we tried and failed". The
+/// distinction only survives if nothing records a call site for these files in the first place —
+/// so this asserts the *buckets*, not just the absence of edges. `fmt_rate` in
+/// `tests/examples_metrics.rs` renders `n/a (no call sites)` exactly when all three are zero, which
+/// is what makes the README's claim about `.cstack` true rather than aspirational.
+#[test]
+fn cstack_repo_records_definitions_and_never_records_a_call_site() {
+    let options = WalkOptions::builder().build_graph(true).build();
+    let out = walk_checkout(&fixture_root("cstack-repo"), &options).expect("walk fixture");
+
+    assert!(
+        out.graph.nodes.len() > 1,
+        "expected declaration nodes beyond the file node",
+    );
+    assert!(
+        !out.graph.edges.iter().any(|e| e.relation == "calls"),
+        "`.cstack` is declarative and must contribute no `calls` edges",
+    );
+    assert_eq!(
+        out.stats.calls_resolved, 0,
+        "a resolved call site in a declarative schema would be invented",
+    );
+}
+
+/// Every declaration kind the grammar classifies reaches the graph. A tags query that matched
+/// nothing would fail open (AGENTS.md §11) and this fixture would still "pass" its golden with a
+/// file node and nothing else.
+#[test]
+fn cstack_repo_graphs_every_declaration_kind() {
+    let g = assert_matches_golden("cstack-repo");
+    let labels = g
+        .nodes
+        .iter()
+        .map(|n| n.label.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+
+    for expected in [
+        "Timestamps",    // mixin    -> interface
+        "Role",          // enum     -> enum
+        "PublishInput",  // type     -> class
+        "User",          // model    -> class
+        "PublishedPost", // view     -> class
+        "listAuthors()", // procedure -> function
+        "publishPost()",
+    ] {
+        assert!(labels.contains(expected), "missing {expected}: {labels:?}");
+    }
+}

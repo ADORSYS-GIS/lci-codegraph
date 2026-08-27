@@ -277,6 +277,15 @@ flowchart LR
 | TypeScript | `.ts` | tree-sitter | JavaScript's `tags.scm` **composed with** TypeScript's `tags.scm` — the TS query alone only covers TS-specific constructs (signatures, interfaces, modules), not concrete `class`/`function`/`method`/`call` |
 | TSX | `.tsx` | tree-sitter (JSX-aware grammar) | Same composed JS+TS `tags.scm`, run against the dedicated TSX grammar (the plain TypeScript grammar cannot parse JSX) |
 | Java | `.java` | tree-sitter | The grammar's bundled `tags.scm` (`tree-sitter-java::TAGS_QUERY`) |
+| CrateStack schema | `.cstack` | tree-sitter | The grammar's bundled `tags.scm` (`tree-sitter-cstack::TAGS_QUERY`). **Definitions only — see below** |
+
+`.cstack` is the one entry in that table that contributes **no `calls` edges, ever**. It is a
+declarative schema language: a `procedure` is declared in the schema and implemented in Rust, and
+nothing inside a schema invokes anything else in it, so the grammar's `tags.scm` emits no
+`@reference.call`. These files produce definition nodes (`model`/`type`/`view` → class, `mixin` →
+interface, `enum` → enum, `procedure` → function) and the `contains` edges nesting them under the
+file, and nothing else. A resolution rate over them renders `n/a (no call sites)` rather than
+`0.0%` — nothing was recorded to resolve, which is a different fact from having tried and failed.
 
 A second, smaller set of extensions has **no tree-sitter grammar** and therefore no structural graph,
 but does carry a language tag so the windowed-text fallback applies — those files are chunked,

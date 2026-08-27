@@ -1,0 +1,100 @@
+{
+  "nodes": [
+    {
+      "node_id": "schema/blog.cstack",
+      "label": "blog.cstack",
+      "source_file": "schema/blog.cstack",
+      "start_line": 1
+    },
+    {
+      "node_id": "schema/blog.cstack#13:Timestamps",
+      "label": "Timestamps",
+      "source_file": "schema/blog.cstack",
+      "start_line": 13
+    },
+    {
+      "node_id": "schema/blog.cstack#18:Role",
+      "label": "Role",
+      "source_file": "schema/blog.cstack",
+      "start_line": 18
+    },
+    {
+      "node_id": "schema/blog.cstack#24:PublishInput",
+      "label": "PublishInput",
+      "source_file": "schema/blog.cstack",
+      "start_line": 24
+    },
+    {
+      "node_id": "schema/blog.cstack#29:User",
+      "label": "User",
+      "source_file": "schema/blog.cstack",
+      "start_line": 29
+    },
+    {
+      "node_id": "schema/blog.cstack#36:Post",
+      "label": "Post",
+      "source_file": "schema/blog.cstack",
+      "start_line": 36
+    },
+    {
+      "node_id": "schema/blog.cstack#44:PublishedPost",
+      "label": "PublishedPost",
+      "source_file": "schema/blog.cstack",
+      "start_line": 44
+    },
+    {
+      "node_id": "schema/blog.cstack#49:listAuthors",
+      "label": "listAuthors()",
+      "source_file": "schema/blog.cstack",
+      "start_line": 49
+    },
+    {
+      "node_id": "schema/blog.cstack#51:publishPost",
+      "label": "publishPost()",
+      "source_file": "schema/blog.cstack",
+      "start_line": 51
+    }
+  ],
+  "edges": [
+    {
+      "source": "schema/blog.cstack",
+      "target": "schema/blog.cstack#13:Timestamps",
+      "relation": "contains"
+    },
+    {
+      "source": "schema/blog.cstack",
+      "target": "schema/blog.cstack#18:Role",
+      "relation": "contains"
+    },
+    {
+      "source": "schema/blog.cstack",
+      "target": "schema/blog.cstack#24:PublishInput",
+      "relation": "contains"
+    },
+    {
+      "source": "schema/blog.cstack",
+      "target": "schema/blog.cstack#29:User",
+      "relation": "contains"
+    },
+    {
+      "source": "schema/blog.cstack",
+      "target": "schema/blog.cstack#36:Post",
+      "relation": "contains"
+    },
+    {
+      "source": "schema/blog.cstack",
+      "target": "schema/blog.cstack#44:PublishedPost",
+      "relation": "contains"
+    },
+    {
+      "source": "schema/blog.cstack",
+      "target": "schema/blog.cstack#49:listAuthors",
+      "relation": "contains"
+    },
+    {
+      "source": "schema/blog.cstack",
+      "target": "schema/blog.cstack#51:publishPost",
+      "relation": "contains"
+    }
+  ]
+}
