@@ -117,6 +117,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** the five crate-specific embedding env vars moved under this crate's namespace:
+  `OPENAI_EMBEDDING_MODEL`, `_DIMENSIONS`, `_TIMEOUT_SECS`, `_MAX_RETRIES` and `_MAX_INPUT_CHARS` are
+  now `LCI_CODEGRAPH_EMBEDDING_MODEL`, `_DIMENSIONS`, `_TIMEOUT_SECS`, `_MAX_RETRIES` and
+  `_MAX_INPUT_CHARS`. This is a hard cutover — the old names are not read, and there is no fallback
+  or deprecation shim. **An operator who still exports the old names gets the defaults silently**: no
+  warning, no error, just `text-embedding-3-small` and a 30s timeout in place of whatever was
+  configured. Grep your deployment manifests rather than waiting to notice.
+  `OPENAI_BASE_URL` and `OPENAI_API_KEY` are deliberately **unchanged** — they name someone else's
+  service under the name the ecosystem already uses, whereas the five above configure this crate and
+  belong beside `LCI_CODEGRAPH_EMBED_BATCH_SIZE` (see #14, which namespaced the tuning knobs).
 - `src/walk.rs` is now a thin filesystem-reader driver: `walk_checkout` builds an `FsSource`, pushes
   every input it yields into an `Indexer`, records the pruned count, calls `finish`, and — when
   `WalkOptions::embed` is set — calls `embed::embed_output` on the result. The one-parse chunk/graph

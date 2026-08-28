@@ -81,10 +81,18 @@ impl EmbedConfig {
     /// Build from the process environment. `None` when `OPENAI_BASE_URL` is unset or blank — **the**
     /// switch that decides whether a walk embeds at all.
     ///
-    /// Note there is deliberately no `OPENAI_EMBEDDING_BATCH_SIZE` here: batch size reuses the
+    /// The variable names split on one line, and it is worth stating because it looks inconsistent
+    /// otherwise: `OPENAI_BASE_URL` and `OPENAI_API_KEY` describe *someone else's* service and are
+    /// already exported in most environments that talk to an OpenAI-compatible endpoint, so this
+    /// crate reads the names the ecosystem already uses rather than making operators copy a value
+    /// they have set under a second name. Everything below them configures *this crate's* behaviour,
+    /// answers to nobody else's convention, and therefore lives under `LCI_CODEGRAPH_` with the rest
+    /// of the crate's knobs.
+    ///
+    /// Note there is deliberately no separate embedding batch-size variable: batch size reuses the
     /// **existing** [`crate::IndexTuning::embed_batch_size`] (`LCI_CODEGRAPH_EMBED_BATCH_SIZE`,
     /// default 32) — that knob already exists for exactly this, and duplicating it would give two
-    /// names for one setting.
+    /// confusingly similar names for one setting.
     #[must_use]
     pub fn from_env() -> Option<Self> {
         Self::from_lookup(|key| std::env::var(key).ok())
@@ -103,14 +111,16 @@ impl EmbedConfig {
         // there is no single `builder` variable that could hold both. `maybe_*(None)` and never
         // calling the setter both land on the same default, but only the former keeps the type static.
         let api_key = non_blank(get("OPENAI_API_KEY"));
-        let model = non_blank(get("OPENAI_EMBEDDING_MODEL"));
-        let dimensions = get("OPENAI_EMBEDDING_DIMENSIONS").and_then(|v| v.trim().parse().ok());
-        let timeout = get("OPENAI_EMBEDDING_TIMEOUT_SECS")
+        let model = non_blank(get("LCI_CODEGRAPH_EMBEDDING_MODEL"));
+        let dimensions =
+            get("LCI_CODEGRAPH_EMBEDDING_DIMENSIONS").and_then(|v| v.trim().parse().ok());
+        let timeout = get("LCI_CODEGRAPH_EMBEDDING_TIMEOUT_SECS")
             .and_then(|v| v.trim().parse::<u64>().ok())
             .filter(|&secs| secs > 0)
             .map(Duration::from_secs);
-        let max_retries = get("OPENAI_EMBEDDING_MAX_RETRIES").and_then(|v| v.trim().parse().ok());
-        let max_input_chars = get("OPENAI_EMBEDDING_MAX_INPUT_CHARS")
+        let max_retries =
+            get("LCI_CODEGRAPH_EMBEDDING_MAX_RETRIES").and_then(|v| v.trim().parse().ok());
+        let max_input_chars = get("LCI_CODEGRAPH_EMBEDDING_MAX_INPUT_CHARS")
             .and_then(|v| v.trim().parse::<usize>().ok())
             .filter(|&chars| chars > 0);
 
@@ -278,11 +288,11 @@ mod tests {
         let config = EmbedConfig::from_lookup(lookup(&[
             ("OPENAI_BASE_URL", "https://gw.internal/v1"),
             ("OPENAI_API_KEY", "abc123"),
-            ("OPENAI_EMBEDDING_MODEL", "custom-model"),
-            ("OPENAI_EMBEDDING_DIMENSIONS", "512"),
-            ("OPENAI_EMBEDDING_TIMEOUT_SECS", "45"),
-            ("OPENAI_EMBEDDING_MAX_RETRIES", "5"),
-            ("OPENAI_EMBEDDING_MAX_INPUT_CHARS", "1234"),
+            ("LCI_CODEGRAPH_EMBEDDING_MODEL", "custom-model"),
+            ("LCI_CODEGRAPH_EMBEDDING_DIMENSIONS", "512"),
+            ("LCI_CODEGRAPH_EMBEDDING_TIMEOUT_SECS", "45"),
+            ("LCI_CODEGRAPH_EMBEDDING_MAX_RETRIES", "5"),
+            ("LCI_CODEGRAPH_EMBEDDING_MAX_INPUT_CHARS", "1234"),
         ]))
         .unwrap();
         assert_eq!(config.base_url, "https://gw.internal/v1");
@@ -308,7 +318,7 @@ mod tests {
     fn from_lookup_unparseable_dimensions_is_none_not_an_error() {
         let config = EmbedConfig::from_lookup(lookup(&[
             ("OPENAI_BASE_URL", "https://x"),
-            ("OPENAI_EMBEDDING_DIMENSIONS", "not-a-number"),
+            ("LCI_CODEGRAPH_EMBEDDING_DIMENSIONS", "not-a-number"),
         ]))
         .unwrap();
         assert!(config.dimensions.is_none());
@@ -318,14 +328,14 @@ mod tests {
     fn from_lookup_zero_or_unparseable_timeout_falls_back_to_default() {
         let zero = EmbedConfig::from_lookup(lookup(&[
             ("OPENAI_BASE_URL", "https://x"),
-            ("OPENAI_EMBEDDING_TIMEOUT_SECS", "0"),
+            ("LCI_CODEGRAPH_EMBEDDING_TIMEOUT_SECS", "0"),
         ]))
         .unwrap();
         assert_eq!(zero.timeout, Duration::from_secs(30));
 
         let garbage = EmbedConfig::from_lookup(lookup(&[
             ("OPENAI_BASE_URL", "https://x"),
-            ("OPENAI_EMBEDDING_TIMEOUT_SECS", "soon"),
+            ("LCI_CODEGRAPH_EMBEDDING_TIMEOUT_SECS", "soon"),
         ]))
         .unwrap();
         assert_eq!(garbage.timeout, Duration::from_secs(30));
@@ -335,7 +345,7 @@ mod tests {
     fn from_lookup_zero_max_retries_is_legal() {
         let config = EmbedConfig::from_lookup(lookup(&[
             ("OPENAI_BASE_URL", "https://x"),
-            ("OPENAI_EMBEDDING_MAX_RETRIES", "0"),
+            ("LCI_CODEGRAPH_EMBEDDING_MAX_RETRIES", "0"),
         ]))
         .unwrap();
         assert_eq!(config.max_retries, 0);
@@ -345,7 +355,7 @@ mod tests {
     fn from_lookup_zero_max_input_chars_falls_back_to_default() {
         let config = EmbedConfig::from_lookup(lookup(&[
             ("OPENAI_BASE_URL", "https://x"),
-            ("OPENAI_EMBEDDING_MAX_INPUT_CHARS", "0"),
+            ("LCI_CODEGRAPH_EMBEDDING_MAX_INPUT_CHARS", "0"),
         ]))
         .unwrap();
         assert_eq!(config.max_input_chars, 8000);

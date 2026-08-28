@@ -22,13 +22,8 @@ use super::EmbedConfig;
 /// it: a repo-sized graph can hold tens of thousands of nodes, and every value here is a reference
 /// back into `graph`'s own storage.
 pub(crate) struct ContextIndex<'g> {
-    /// Nodes grouped by source file, each tagged with its 1-based `start_line`, for chunk→node
-    /// mapping. Not keyed by `(file, line)` directly: a `HashMap` keyed on a borrowed tuple can only
-    /// ever be looked up with a key borrowed for the *same* lifetime as the map's own borrow of
-    /// `graph`, which a short-lived `&Chunk` can't satisfy — grouping by file (looked up through the
-    /// stdlib's `&str: Borrow<str>` blanket impl, lifetime-independent) and filtering by line inside
-    /// [`Self::map_chunk`] sidesteps that without cloning every file path.
-    by_location: HashMap<&'g str, Vec<(i64, &'g GraphNode)>>,
+    /// Node id → node, for resolving [`Chunk::node_id`] directly.
+    by_id: HashMap<&'g str, &'g GraphNode>,
     /// `calls` edges, source node id → callee nodes.
     callees: HashMap<&'g str, Vec<&'g GraphNode>>,
     /// `calls` edges, target node id → caller nodes.
@@ -47,14 +42,6 @@ impl<'g> ContextIndex<'g> {
             .iter()
             .map(|n| (n.node_id.as_str(), n))
             .collect();
-
-        let mut by_location: HashMap<&'g str, Vec<(i64, &'g GraphNode)>> = HashMap::new();
-        for n in &graph.nodes {
-            by_location
-                .entry(n.source_file.as_str())
-                .or_default()
-                .push((n.start_line, n));
-        }
 
         let mut callees: HashMap<&'g str, Vec<&'g GraphNode>> = HashMap::new();
         let mut callers: HashMap<&'g str, Vec<&'g GraphNode>> = HashMap::new();
@@ -91,41 +78,27 @@ impl<'g> ContextIndex<'g> {
         }
 
         Self {
-            by_location,
+            by_id,
             callees,
             callers,
             container,
         }
     }
 
-    /// Map a chunk to its graph node. Graph node ids are `<file>#<line>:<name-or-kind>` with a
-    /// **1-based** `start_line`, while [`Chunk::start_line`] is **0-based** — so the lookup is at
-    /// `(chunk.file_path, chunk.start_line + 1)`. When several nodes share that location, the one
-    /// whose `node_id` ends with `:{symbol_name}` wins when the chunk carries a symbol name;
-    /// otherwise the first in sorted-`node_id` order, so the choice is deterministic rather than
-    /// dependent on `Graph`'s incidental node order.
-    ///
-    /// Returns `None` for a `window` chunk, a PDF chunk, or any chunk from a walk with
-    /// `build_graph: false` — that's the normal case, not an error.
+    /// Map a chunk to its graph node via [`Chunk::node_id`]. The chunker and the graph pass share one
+    /// parse per file (ADR-0086), so a chunk that corresponds to a definition already knows which
+    /// node it is the body of — there is no location or naming convention left to reconstruct here,
+    /// and no ambiguity to break a tie on. Prior to `node_id` existing, this looked a node up by
+    /// `(file, line)` and guessed among same-line candidates by symbol-name suffix; that guess could
+    /// mis-attribute context when several definitions started on the same line (an inner `impl` and
+    /// its first method, for instance). A `node_id` naming a node absent from the graph — which
+    /// shouldn't happen, but this index has no business panicking over a graph invariant it doesn't
+    /// own — degrades to `None` the same as an unset one.
     pub(crate) fn map_chunk(&self, chunk: &Chunk) -> Option<&'g GraphNode> {
-        let line = i64::from(chunk.start_line) + 1;
-        let candidates = self.by_location.get(chunk.file_path.as_str())?;
-        let mut at_line: Vec<&'g GraphNode> = candidates
-            .iter()
-            .filter(|(l, _)| *l == line)
-            .map(|(_, n)| *n)
-            .collect();
-        if at_line.is_empty() {
-            return None;
-        }
-        if let Some(symbol_name) = &chunk.symbol_name {
-            let suffix = format!(":{symbol_name}");
-            if let Some(&exact) = at_line.iter().find(|n| n.node_id.ends_with(&suffix)) {
-                return Some(exact);
-            }
-        }
-        at_line.sort_by(|a, b| a.node_id.cmp(&b.node_id));
-        Some(at_line[0])
+        chunk
+            .node_id
+            .as_deref()
+            .and_then(|id| self.by_id.get(id).copied())
     }
 
     fn container(&self, node: &GraphNode) -> Option<&'g GraphNode> {
@@ -242,7 +215,13 @@ mod tests {
         }
     }
 
-    fn chunk(file: &str, start_line: i32, symbol_name: Option<&str>, chunk_type: &str) -> Chunk {
+    fn chunk(
+        file: &str,
+        start_line: i32,
+        symbol_name: Option<&str>,
+        chunk_type: &str,
+        node_id: Option<&str>,
+    ) -> Chunk {
         Chunk {
             file_path: file.to_string(),
             language: "rust".to_string(),
@@ -251,7 +230,7 @@ mod tests {
             start_line,
             end_line: start_line,
             content: "fn body() {}".to_string(),
-            node_id: None,
+            node_id: node_id.map(str::to_string),
             embedding: None,
             embed_input: None,
         }
@@ -278,13 +257,28 @@ mod tests {
     }
 
     #[test]
-    fn maps_chunk_to_node_via_0_based_to_1_based_offset() {
+    fn maps_chunk_to_node_via_node_id() {
         let graph = sample_graph();
         let index = ContextIndex::build(&graph);
-        // Chunk::start_line is 0-based; the node at a.rs line 3 (1-based) maps from chunk start_line 2.
-        let c = chunk("a.rs", 2, Some("caller"), "function");
+        let c = chunk("a.rs", 2, Some("caller"), "function", Some("a.rs#3:caller"));
         let mapped = index.map_chunk(&c).expect("chunk should map to a node");
         assert_eq!(mapped.node_id, "a.rs#3:caller");
+    }
+
+    #[test]
+    fn node_id_naming_a_node_absent_from_the_graph_degrades_to_none() {
+        let graph = sample_graph();
+        let index = ContextIndex::build(&graph);
+        // A node_id that doesn't exist in this graph — e.g. a stale value, or a bug upstream — must
+        // not panic; it's treated the same as an unset node_id.
+        let c = chunk(
+            "a.rs",
+            2,
+            Some("caller"),
+            "function",
+            Some("a.rs#999:nonexistent"),
+        );
+        assert!(index.map_chunk(&c).is_none());
     }
 
     #[test]
@@ -292,7 +286,7 @@ mod tests {
         let graph = sample_graph();
         let index = ContextIndex::build(&graph);
         let config = EmbedConfig::builder().base_url("http://x").build();
-        let c = chunk("a.rs", 2, Some("caller"), "function");
+        let c = chunk("a.rs", 2, Some("caller"), "function", Some("a.rs#3:caller"));
         let input = embed_input(&c, &index, &config);
         assert!(
             input.contains("// within: impl Svc"),
@@ -323,7 +317,7 @@ mod tests {
             .base_url("http://x")
             .max_context_refs(2)
             .build();
-        let c = chunk("a.rs", 2, Some("caller"), "function");
+        let c = chunk("a.rs", 2, Some("caller"), "function", Some("a.rs#3:caller"));
         let input = embed_input(&c, &index, &config);
 
         let calls_line = input
@@ -337,7 +331,7 @@ mod tests {
         );
 
         let target_index = ContextIndex::build(&graph);
-        let target_chunk = chunk("b.rs", 0, Some("target"), "function");
+        let target_chunk = chunk("b.rs", 0, Some("target"), "function", Some("b.rs#1:target"));
         let target_input = embed_input(&target_chunk, &target_index, &config);
         assert!(
             target_input.contains("// called by: caller() [a.rs]"),
@@ -350,8 +344,8 @@ mod tests {
         let graph = sample_graph();
         let index = ContextIndex::build(&graph);
         let config = EmbedConfig::builder().base_url("http://x").build();
-        // A window chunk: no symbol name, and a line with no node at all (line 99).
-        let c = chunk("a.rs", 99, None, "window");
+        // A window chunk: no symbol name and no node_id — window/PDF/no-graph chunks never carry one.
+        let c = chunk("a.rs", 99, None, "window", None);
         let input = embed_input(&c, &index, &config);
         assert!(input.starts_with("// file: a.rs\n// language: rust\n// window\n\n"));
         assert!(!input.contains("within:"));
@@ -363,7 +357,7 @@ mod tests {
     fn build_is_deterministic_across_two_runs_over_the_same_graph() {
         let graph = sample_graph();
         let config = EmbedConfig::builder().base_url("http://x").build();
-        let c = chunk("a.rs", 2, Some("caller"), "function");
+        let c = chunk("a.rs", 2, Some("caller"), "function", Some("a.rs#3:caller"));
 
         let first = embed_input(&c, &ContextIndex::build(&graph), &config);
         let second = embed_input(&c, &ContextIndex::build(&graph), &config);
@@ -415,7 +409,7 @@ mod tests {
         let graph = Graph::default();
         let index = ContextIndex::build(&graph);
         let config = EmbedConfig::builder().base_url("http://x").build();
-        let c = chunk("f.rs", 0, None, "impl");
+        let c = chunk("f.rs", 0, None, "impl", None);
         let input = embed_input(&c, &index, &config);
         assert!(input.contains("// impl\n"));
         assert!(!input.contains("// impl:"));
