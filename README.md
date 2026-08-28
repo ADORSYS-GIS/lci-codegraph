@@ -500,19 +500,25 @@ wires that straight into `WalkOptions::embed`. The API key is a separate, option
 configuration, not a missing one: a local gateway, vLLM, or Ollama's OpenAI-compatible shim typically
 needs no key at all.
 
+The two prefixes are a deliberate split, not an oversight. `OPENAI_BASE_URL` and `OPENAI_API_KEY`
+describe someone else's service and are already exported in most environments that talk to an
+OpenAI-compatible endpoint, so this crate reads the names the ecosystem already uses instead of making
+you copy a value you have already set. Everything else configures *this crate* and lives under
+`LCI_CODEGRAPH_`, alongside the knobs in [Configuration](#configuration).
+
 | Env var | Maps to | Default | Meaning |
 |---|---|---|---|
 | `OPENAI_BASE_URL` | `EmbedConfig::base_url` | unset | **The switch.** Unset or blank → nothing is embedded, zero extra requests. Set → the API base, e.g. `https://api.openai.com/v1`; the request URL is `{base_url}/embeddings` |
 | `OPENAI_API_KEY` | `EmbedConfig::api_key` | `None` | Sent as `Authorization: Bearer <key>` only when set. Blank/whitespace-only counts as unset |
-| `OPENAI_EMBEDDING_MODEL` | `EmbedConfig::model` | `text-embedding-3-small` | Falls back to the default when unset |
-| `OPENAI_EMBEDDING_DIMENSIONS` | `EmbedConfig::dimensions` | `None` | Passed through as the request's `dimensions` field only when set (not every server accepts it). Unparseable → `None`, not an error |
-| `OPENAI_EMBEDDING_TIMEOUT_SECS` | `EmbedConfig::timeout` | `30` | Per-request timeout, in seconds. Unparseable or `0` → default |
-| `OPENAI_EMBEDDING_MAX_RETRIES` | `EmbedConfig::max_retries` | `3` | Retries on `429` / `5xx` / transport error, exponential backoff starting at 500ms. Unparseable → default; `0` is legal (no retry) |
-| `OPENAI_EMBEDDING_MAX_INPUT_CHARS` | `EmbedConfig::max_input_chars` | `8000` | Each input is truncated to this many **chars** (not bytes) before being sent. Unparseable or `0` → default |
+| `LCI_CODEGRAPH_EMBEDDING_MODEL` | `EmbedConfig::model` | `text-embedding-3-small` | Falls back to the default when unset |
+| `LCI_CODEGRAPH_EMBEDDING_DIMENSIONS` | `EmbedConfig::dimensions` | `None` | Passed through as the request's `dimensions` field only when set (not every server accepts it). Unparseable → `None`, not an error |
+| `LCI_CODEGRAPH_EMBEDDING_TIMEOUT_SECS` | `EmbedConfig::timeout` | `30` | Per-request timeout, in seconds. Unparseable or `0` → default |
+| `LCI_CODEGRAPH_EMBEDDING_MAX_RETRIES` | `EmbedConfig::max_retries` | `3` | Retries on `429` / `5xx` / transport error, exponential backoff starting at 500ms. Unparseable → default; `0` is legal (no retry) |
+| `LCI_CODEGRAPH_EMBEDDING_MAX_INPUT_CHARS` | `EmbedConfig::max_input_chars` | `8000` | Each input is truncated to this many **chars** (not bytes) before being sent. Unparseable or `0` → default |
 
-There is deliberately no `OPENAI_EMBEDDING_BATCH_SIZE`: batch size reuses the **existing**
+There is deliberately no separate embedding batch-size variable: batch size reuses the **existing**
 `LCI_CODEGRAPH_EMBED_BATCH_SIZE` / `IndexTuning::embed_batch_size` knob (default 32, see
-[Configuration](#configuration)) rather than adding a second name for the same setting.
+[Configuration](#configuration)) rather than adding a second, confusingly similar name for one setting.
 `EmbedConfig::max_context_refs` (default `8`, the max callees and max callers listed in the context
 header, each side capped independently) has no environment variable — set it through the `EmbedConfig`
 builder directly.
