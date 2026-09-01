@@ -42,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Chunk::embedding: Option<Vec<f32>>` and `Chunk::embed_input: Option<String>` (both
   `#[serde(skip_serializing_if = "Option::is_none")]`, so existing JSON output is unchanged when
   embedding is off).
+- `Chunk::node_id: Option<String>`, linking a chunk to the graph node it is the body of. Populated
+  inside `Indexer::push` from the same per-file symbols the chunker's parse tree already produced,
+  computed the same way `graph::extract_file` derives a definition's node id (file, 1-based
+  start_line, name-or-kind-fallback) and only accepted once verified to exist among that file's own
+  just-emitted graph nodes — never a guess: a caller previously had to reconstruct this id externally
+  by string-building and hoping it matched. `None` for windowed/PDF chunks, any
+  `build_graph: false` walk, and any chunk whose definition the graph pass didn't independently
+  discover under the same name — `None` is the honest answer there too, not a guess.
 - `crates/lci-codegraph-model` and `crates/lci-codegraph-spring`: the repo root is now a Cargo
   workspace, not a single crate. `lci-codegraph` (this package) keeps its existing paths (`src/`,
   `tests/`, `examples/`, `docs/`) and public API unchanged — nothing about depending on it moved.
