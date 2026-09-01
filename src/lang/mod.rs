@@ -13,10 +13,16 @@
 //! tree-sitter pass").
 
 mod cstack;
+mod dart;
 mod java;
 mod javascript;
+mod jinja2;
+mod json;
+mod postgres;
 mod python;
 mod rust;
+mod scala;
+mod swift;
 mod typescript;
 
 use std::path::Path;
@@ -61,6 +67,12 @@ static REGISTRY: &[&dyn LanguageSupport] = &[
     &typescript::Tsx,
     &java::Java,
     &cstack::Cstack,
+    &scala::Scala,
+    &dart::Dart,
+    &swift::Swift,
+    &json::Json,
+    &jinja2::Jinja2,
+    &postgres::Postgres,
 ];
 
 /// All supported languages (those the crate ships a tree-sitter grammar for).
@@ -124,11 +136,17 @@ pub fn from_path(path: &Path) -> Option<&'static str> {
         // (`examples/apps/spring-boot-gradle-kotlin` is that case, committed as a fixture). Tagging
         // them buys the windowed-text fallback: searchable, still not graphed. The `has_graph`
         // check downstream is what keeps the graph honest — a tag here is not a claim of extraction.
+        //
+        // Kotlin stays here rather than joining the registry below: every `tree-sitter-kotlin`
+        // version published to crates.io pins a runtime `tree-sitter` dependency incompatible with
+        // this crate's `tree-sitter = "0.26"` (Cargo's `links = "tree-sitter"` uniqueness rule
+        // rejects the combination outright — see the comment on `tree-sitter-scala` et al. in
+        // `Cargo.toml`). Move it once a compatible version ships.
         Some("kt" | "kts") => Some("kotlin"),
         Some("gradle") => Some("groovy"),
         Some("c" | "h") => Some("c"),
         Some("cpp" | "cc" | "cxx" | "hpp") => Some("cpp"),
-        Some("md" | "txt" | "toml" | "yaml" | "yml" | "json") => Some("text"),
+        Some("md" | "txt" | "toml" | "yaml" | "yml") => Some("text"),
         _ => None,
     }
 }
@@ -140,10 +158,13 @@ pub fn has_grammar(language: &str) -> bool {
 }
 
 /// True for languages the structural **graph** builder has a real extractor for today: Rust
-/// (ADR-0086 "Rust language first"), Python, TypeScript/JavaScript (incl. TSX), and Java. This is
-/// derived from the registry ([`LanguageSupport::graph_strategy`]), so it can no longer drift from
-/// the classifier the way a hand-maintained parallel list could. Languages absent here still get
-/// chunked and stay semantically searchable via the windowed-text fallback.
+/// (ADR-0086 "Rust language first"), Python, TypeScript/JavaScript (incl. TSX), Java, Scala, Dart,
+/// and Swift. This is derived from the registry ([`LanguageSupport::graph_strategy`]), so it can no
+/// longer drift from the classifier the way a hand-maintained parallel list could. A language can be
+/// in the registry (parsed, chunked) without being here — JSON, Jinja2, and Postgres ship a grammar
+/// but no extractor (see each `src/lang/<language>.rs` for why) — and those still get chunked and
+/// stay semantically searchable via the windowed-text fallback, same as Kotlin/Groovy below, which
+/// have no grammar in the registry at all yet.
 #[must_use]
 pub fn has_graph(language: &str) -> bool {
     by_id(language)
@@ -193,8 +214,14 @@ mod tests {
         assert!(has_graph("javascript"));
         assert!(has_graph("tsx"));
         assert!(has_graph("java"));
+        assert!(has_graph("scala"));
+        assert!(has_graph("dart"));
+        assert!(has_graph("swift"));
         // A language we chunk but have no graph extractor for must NOT claim graph support.
         assert!(!has_graph("go"));
+        assert!(!has_graph("json"));
+        assert!(!has_graph("jinja2"));
+        assert!(!has_graph("postgres"));
         // A language tag is not a graph extractor. Kotlin/Groovy are chunked via the windowed-text
         // fallback so they are semantically searchable, and must NOT claim structural extraction.
         assert!(!has_graph("kotlin"));

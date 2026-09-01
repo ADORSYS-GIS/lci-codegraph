@@ -98,6 +98,10 @@ fn map_def_kind(suffix: &str) -> Option<&'static str> {
         "function" => Some("function"),
         "method" => Some("method"),
         "class" => Some("class"),
+        // Scala's singleton `object` (`@definition.object` in its tags.scm) has no dedicated bucket
+        // in this vocabulary — it is a type container like a class, just one with exactly one
+        // instance, so it is folded into "class" rather than dropped like `constant`/`module` below.
+        "object" => Some("class"),
         "interface" => Some("interface"),
         "enum" => Some("enum"),
         _ => None,
@@ -174,5 +178,17 @@ mod tests {
             "arrow component tagged through JSX: {:?}",
             t.defs
         );
+    }
+
+    #[test]
+    fn scala_object_definitions_are_classified_as_class() {
+        let t = tagged("scala", "object Hello {\n  def a(): Unit = {}\n}\n");
+        let kinds: Vec<&str> = t.defs.values().map(|d| d.kind).collect();
+        assert!(
+            kinds.contains(&"class"),
+            "singleton object folded into class: {:?}",
+            t.defs
+        );
+        assert!(kinds.contains(&"function"), "method captured: {:?}", t.defs);
     }
 }

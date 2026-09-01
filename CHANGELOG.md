@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Scala (`.scala`, `.sc`), Dart (`.dart`), and Swift (`.swift`) join the structural-graph tier
+  alongside Rust/Python/TypeScript/JavaScript/Java/CrateStack: each is a `LanguageSupport` impl in
+  `src/lang/`, classified by the grammar's bundled `tags.scm` (Scala's is vendored under
+  `src/lang/queries/scala_tags.scm` — the published crate doesn't re-export it as `TAGS_QUERY` the
+  way the others do). Scala's singleton `object` definitions are folded into the graph's `class` kind
+  (`src/tags.rs`), the closest existing vocabulary for a type container with exactly one instance.
+- JSON (`.json`), Jinja2 (`.jinja`/`.jinja2`/`.j2`), and Postgres (`.sql`/`.pgsql`) are registered
+  with a real grammar and `graph_strategy() -> None`: none has a `tags.scm` upstream to classify
+  definitions/calls with, so each is parsed but chunked via the windowed-text fallback, same as any
+  language with no grammar at all — just no longer opaque text. `.json` was previously folded into
+  the generic `text` tag; it now has its own grammar and language id.
+
+### Considered, not included
+
+- Kotlin (`.kt`/`.kts`): every `tree-sitter-kotlin` version published to crates.io (through `0.3.8`)
+  declares a runtime `tree-sitter` dependency (`>=0.21, <0.23` or older) that conflicts with this
+  crate's `tree-sitter = "0.26"` via Cargo's `links = "tree-sitter"` uniqueness rule — the dependency
+  graph fails to resolve at all with it added. Upstream's unreleased `main` branch has already fixed
+  this; revisit once a compatible version is published. `.kt`/`.kts` keeps its pre-existing
+  windowed-text-only tag in the meantime (see `src/lang/mod.rs`'s `from_path`).
+
 ## [0.2.0] - 2026-08-28
 
 ### Added

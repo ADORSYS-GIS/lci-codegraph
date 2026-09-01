@@ -278,6 +278,9 @@ flowchart LR
 | TSX | `.tsx` | tree-sitter (JSX-aware grammar) | Same composed JS+TS `tags.scm`, run against the dedicated TSX grammar (the plain TypeScript grammar cannot parse JSX) |
 | Java | `.java` | tree-sitter | The grammar's bundled `tags.scm` (`tree-sitter-java::TAGS_QUERY`) |
 | CrateStack schema | `.cstack` | tree-sitter | The grammar's bundled `tags.scm` (`tree-sitter-cstack::TAGS_QUERY`). **Definitions only — see below** |
+| Scala | `.scala`, `.sc` | tree-sitter | The grammar's `tags.scm`, **vendored** under `src/lang/queries/scala_tags.scm` — the published crate doesn't re-export it as `TAGS_QUERY` |
+| Dart | `.dart` | tree-sitter | The grammar's bundled `tags.scm` (`tree-sitter-dart::TAGS_QUERY`) |
+| Swift | `.swift` | tree-sitter | The grammar's bundled `tags.scm` (`tree-sitter-swift::TAGS_QUERY`) |
 
 `.cstack` is the one entry in that table that contributes **no `calls` edges, ever**. It is a
 declarative schema language: a `procedure` is declared in the schema and implemented in Rust, and
@@ -287,25 +290,29 @@ interface, `enum` → enum, `procedure` → function) and the `contains` edges n
 file, and nothing else. A resolution rate over them renders `n/a (no call sites)` rather than
 `0.0%` — nothing was recorded to resolve, which is a different fact from having tried and failed.
 
-A second, smaller set of extensions has **no tree-sitter grammar** and therefore no structural graph,
-but does carry a language tag so the windowed-text fallback applies — those files are chunked,
-embedded, and semantically searchable, they simply contribute no nodes or edges: `.kt`/`.kts`
-(Kotlin), `.gradle` (Groovy), `.go`, `.c`/`.h`, `.cpp`/`.cc`/`.cxx`/`.hpp`, and
-`.md`/`.txt`/`.toml`/`.yaml`/`.yml`/`.json` (tagged `text`).
+A second tier has a **real tree-sitter grammar** — parsed, chunked, registered in `REGISTRY` — but no
+graph extractor, because no `tags.scm` is available to run: `.json` (JSON — no functions or calls to
+extract), `.jinja`/`.jinja2`/`.j2` (Jinja2), and `.sql`/`.pgsql` (Postgres — the `LANGUAGE_PLPGSQL`
+grammar the same crate ships is deliberately not wired in; see `src/lang/postgres.rs` for why). These
+are chunked via the windowed-text fallback, same as the third tier below, but their content is at
+least tree-sitter-parsed rather than opaque text.
 
-The distinction matters more than it looks. A tag buys **retrieval**; a grammar buys **structure**.
-An extension in neither list is dropped before chunking and produces nothing at all — no chunk, no
-embedding, no search hit. `examples/apps/spring-boot-gradle-kotlin` is a committed sample of a
-language in the middle state: fully searchable, structurally invisible.
+A third, smaller set of extensions has **no tree-sitter grammar at all** and therefore no structural
+graph, but does carry a language tag so the windowed-text fallback applies — those files are chunked,
+embedded, and semantically searchable, they simply contribute no nodes or edges: `.kt`/`.kts`
+(Kotlin — every `tree-sitter-kotlin` version on crates.io pins a `tree-sitter` runtime dependency
+that conflicts with this crate's pinned `0.26`; see the comment on `tree-sitter-scala` in
+`Cargo.toml`), `.gradle` (Groovy), `.go`, `.c`/`.h`, `.cpp`/`.cc`/`.cxx`/`.hpp`, and
+`.md`/`.txt`/`.toml`/`.yaml`/`.yml` (tagged `text`).
+
+The distinction matters more than it looks. A tag buys **retrieval**; a grammar buys **structure**; a
+`tags.scm` on top of the grammar buys the **graph**. An extension in none of the three tiers is
+dropped before chunking and produces nothing at all — no chunk, no embedding, no search hit.
 
 For every one of these, chunking and graph extraction share the **same** parse of the file
 (`WalkOptions::build_graph`).
 
-A few more extensions are recognised as a language *label* with no tree-sitter grammar in this crate
-— `.go`, `.c`/`.h`, `.cpp`/`.cc`/`.cxx`/`.hpp`, and a generic `text` bucket for `.md`/`.txt`/`.toml`/
-`.yaml`/`.yml`/`.json`. These are chunked via the windowed-line fallback only (no structured chunks,
-no graph). Any file whose extension is not recognised at all is skipped entirely — not chunked, not
-graphed.
+Any file whose extension is not recognised at all is skipped entirely — not chunked, not graphed.
 
 Adding a language means implementing one `LanguageSupport` in `src/lang/<language>.rs` and adding it
 to the registry; see `docs/architecture.md`.
