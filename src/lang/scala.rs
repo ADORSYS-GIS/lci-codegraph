@@ -7,6 +7,11 @@
 //! Scala's `object` (a singleton, not present in any other language this crate supports) has no
 //! ready-made bucket in [`crate::tags::map_def_kind`]'s vocabulary — it is mapped onto `"class"`
 //! there, the closest existing graph-node kind, rather than dropped.
+//!
+//! The vendored query is **composed with a local supplement**
+//! (`queries/scala_tags_supplement.scm`) the same way `typescript.rs` composes the JS and TS
+//! queries — the upstream query alone has no pattern for a qualified/member call (`Foo.helper()`,
+//! `x.foo()`), only a bare call (`helper()`); see the supplement file for the verified gap.
 
 use std::sync::OnceLock;
 
@@ -15,6 +20,12 @@ use tree_sitter::{Language, Query};
 use super::{GraphStrategy, LanguageSupport};
 
 const TAGS_QUERY: &str = include_str!("queries/scala_tags.scm");
+const TAGS_QUERY_SUPPLEMENT: &str = include_str!("queries/scala_tags_supplement.scm");
+
+/// The vendored upstream query plus the local qualified-call supplement, composed into one source.
+fn composed_tags_source() -> String {
+    format!("{TAGS_QUERY}\n{TAGS_QUERY_SUPPLEMENT}")
+}
 
 pub struct Scala;
 
@@ -34,8 +45,8 @@ impl LanguageSupport for Scala {
     fn graph_strategy(&self) -> Option<GraphStrategy> {
         static QUERY: OnceLock<Query> = OnceLock::new();
         let query = QUERY.get_or_init(|| {
-            Query::new(&self.ts_language(), TAGS_QUERY)
-                .expect("vendored scala tags.scm query compiles")
+            Query::new(&self.ts_language(), &composed_tags_source())
+                .expect("composed scala tags query compiles")
         });
         Some(GraphStrategy::Tags(query))
     }
