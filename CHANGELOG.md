@@ -21,15 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   language with no grammar at all — just no longer opaque text. `.json` was previously folded into
   the generic `text` tag; it now has its own grammar and language id.
 
-### Considered, not included
-
-- Kotlin (`.kt`/`.kts`): every `tree-sitter-kotlin` version published to crates.io (through `0.3.8`)
-  declares a runtime `tree-sitter` dependency (`>=0.21, <0.23` or older) that conflicts with this
-  crate's `tree-sitter = "0.26"` via Cargo's `links = "tree-sitter"` uniqueness rule — the dependency
-  graph fails to resolve at all with it added. Upstream's unreleased `main` branch has already fixed
-  this; revisit once a compatible version is published. `.kt`/`.kts` keeps its pre-existing
-  windowed-text-only tag in the meantime (see `src/lang/mod.rs`'s `from_path`).
-
 ## [0.2.0] - 2026-08-28
 
 ### Added
