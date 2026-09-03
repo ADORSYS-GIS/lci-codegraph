@@ -377,7 +377,13 @@ tags-driven language that means: point `ts_language()` at the grammar, and retur
 `GraphStrategy::Tags(&query)` where `query` is the grammar's bundled `TAGS_QUERY` (composed with
 another language's `TAGS_QUERY` first, if the grammar's own tags file doesn't cover concrete
 class/function/method/call nodes on its own — see `src/lang/typescript.rs` for the composed-query
-pattern). Nothing in `emit.rs`, `graph::callee`, or `graph::resolve` needs to change: they are written
-against `Classifier`/`GraphStrategy`, not against a per-language `match`. A language with no
-`graph_strategy` (i.e. no grammar in this crate at all) is still chunked via the windowed-text
-fallback — it is simply absent from `graph::resolve`'s input.
+pattern). If the crate doesn't re-export `TAGS_QUERY` even though its own repository ships one,
+vendor the query text under `src/lang/queries/` instead (see `src/lang/scala.rs`). Nothing in
+`emit.rs`, `graph::callee`, or `graph::resolve` needs to change: they are written against
+`Classifier`/`GraphStrategy`, not against a per-language `match`.
+`graph_strategy() -> None` is also valid for a *registered* language: it still parses and chunks
+(`ts_language()` is required regardless), it is simply absent from `graph::resolve`'s input — see
+`src/lang/json.rs` for a grammar with no upstream `tags.scm` at all. A grammar's published Rust crate
+can also be un-registrable outright — `src/lang/mod.rs`'s `from_path` fallback documents Kotlin's
+case, where every `tree-sitter-kotlin` release pins a `tree-sitter` runtime version incompatible with
+this crate's own pin.

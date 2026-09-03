@@ -128,6 +128,27 @@ tree-sitter-java = { workspace = true }
 # CrateStack `.cstack` schemas. Declarative, so this grammar contributes definitions
 # and no call sites — see `src/lang/cstack.rs` for why that is the language, not a gap.
 tree-sitter-cstack = "0.1"
+# Scala/Dart/Swift: same tags.scm-driven graph strategy as Python/JavaScript/Java above — see
+# each `src/lang/<language>.rs`. JSON/Jinja2/Postgres ship a grammar for chunking but no bundled
+# `tags.scm` upstream, so their `graph_strategy()` is `None` (see `src/lang/json.rs`,
+# `src/lang/jinja2.rs`, `src/lang/postgres.rs`).
+#
+# Kotlin is deliberately NOT here: every `tree-sitter-kotlin` version published to crates.io
+# (through 0.3.8) declares a runtime `tree-sitter = ">=0.21, <0.23"` dependency, which conflicts —
+# via Cargo's `links = "tree-sitter"` uniqueness rule, only one copy of the native library may link
+# — with this workspace's `tree-sitter = "0.26"`. `cargo build` fails to resolve a dependency graph
+# at all with it added. Upstream's `main` branch has already decoupled this (via
+# `tree-sitter-language`, the same binding style every grammar below uses) but has not cut a
+# release with the fix. Add Kotlin once that ships.
+tree-sitter-scala = "0.26.2"
+tree-sitter-json = "0.24.8"
+tree-sitter-jinja2 = "0.0.16"
+tree-sitter-dart = "0.2.0"
+tree-sitter-swift = "0.7.3"
+# Pinned to the last stable release, not `newest_version` (a `19.0.0-beta.2` prerelease at time of
+# writing) — this crate's versioning tracks upstream PostgreSQL release numbers, not its own API
+# stability.
+tree-sitter-postgres = "1.2.4"
 # ripgrep's ignore engine: honours the repo's own `.gitignore` AND lets us layer an
 # operator-configurable glob list on top with the SAME gitignore semantics (`GitignoreBuilder`).
 # This is how the crate *composes with* — rather than replaces — the repo ignores.

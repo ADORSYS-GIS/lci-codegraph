@@ -23,7 +23,8 @@
 //!   repo `.gitignore`, replacing the old hardcoded dir set.
 //! - [`pdf`] — bounded PDF text extraction (byte-capped before parse, panic-caught).
 //! - [`graph`] — the structural call/reference graph with **cross-file resolution** for Rust, Python,
-//!   TypeScript/JavaScript (incl. TSX/JSX), and Java.
+//!   TypeScript/JavaScript (incl. TSX/JSX), Java, Scala, Dart, and Swift — see [`lang`] for the full
+//!   registry, including grammars chunked but not yet graphed (JSON, Jinja2, Postgres).
 //! - [`embed`] — semantic embeddings against an OpenAI-compatible endpoint, with a graph-aware context
 //!   header built from the resolved [`Graph`]. No local/in-process model, no feature gate: live
 //!   whenever `OPENAI_BASE_URL` (or an explicit [`EmbedConfig`]) says so. Runs over any reader's

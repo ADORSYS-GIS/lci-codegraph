@@ -91,15 +91,26 @@ pub fn extract(language: &str, tree: &Tree, source: &str) -> Option<TaggedSymbol
 }
 
 /// Map a `tags.scm` `@definition.<suffix>` capture to a graph node kind, or `None` to skip. We keep
-/// callables + type containers (the graph's vocabulary) and drop `constant`/`module` (module-level
-/// consts and TS namespaces are not call-graph material and were not emitted before).
+/// callables + type containers (the graph's vocabulary) and drop `constant`/`module`/`variable`/
+/// `property` (module-level consts, TS namespaces, Scala `val`/`var`/`given` bindings, and Scala
+/// class-constructor parameters are value bindings, not call-graph material, and were not emitted
+/// before `type` joined the kept set below).
 fn map_def_kind(suffix: &str) -> Option<&'static str> {
     match suffix {
         "function" => Some("function"),
         "method" => Some("method"),
         "class" => Some("class"),
+        // Scala's singleton `object` (`@definition.object` in its tags.scm) has no dedicated bucket
+        // in this vocabulary — it is a type container like a class, just one with exactly one
+        // instance, so it is folded into "class" rather than dropped like `constant`/`variable` below.
+        "object" => Some("class"),
         "interface" => Some("interface"),
         "enum" => Some("enum"),
+        // A type alias is a type container by the doc comment's own definition — Rust's native
+        // extractor already emits this exact kind for `type Foo = Bar;` (`chunk.rs::interesting_node`
+        // "type_alias"), so Scala's `type X = ...` (`@definition.type`) joins the same bucket rather
+        // than being dropped as if it were a value binding.
+        "type" => Some("type"),
         _ => None,
     }
 }
@@ -173,6 +184,57 @@ mod tests {
             names.contains(&Some("W")),
             "arrow component tagged through JSX: {:?}",
             t.defs
+        );
+    }
+
+    #[test]
+    fn scala_object_definitions_are_classified_as_class() {
+        let t = tagged("scala", "object Hello {\n  def a(): Unit = {}\n}\n");
+        let kinds: Vec<&str> = t.defs.values().map(|d| d.kind).collect();
+        assert!(
+            kinds.contains(&"class"),
+            "singleton object folded into class: {:?}",
+            t.defs
+        );
+        assert!(kinds.contains(&"function"), "method captured: {:?}", t.defs);
+    }
+
+    #[test]
+    fn scala_type_alias_is_kept_but_val_and_var_are_dropped() {
+        let t = tagged(
+            "scala",
+            "type Id = Int\nval x: Int = 1\nvar y: Int = 2\ndef a(): Unit = {}\n",
+        );
+        let kinds: Vec<&str> = t.defs.values().map(|d| d.kind).collect();
+        assert!(
+            kinds.contains(&"type"),
+            "type alias kept as a type container: {:?}",
+            t.defs
+        );
+        assert!(
+            !kinds.contains(&"variable"),
+            "val/var must not surface as a graph kind at all: {:?}",
+            t.defs
+        );
+    }
+
+    #[test]
+    fn scala_qualified_calls_are_captured_not_just_bare_calls() {
+        // The vendored upstream query alone only matches a bare `helper()` — `Foo.helper()` needs
+        // the local supplement composed in by `scala.rs`; regression test for that gap.
+        let t = tagged(
+            "scala",
+            "object Foo {\n  def helper(): Unit = {}\n}\nobject Caller {\n  def run(): Unit = {\n    Foo.helper()\n    bare()\n  }\n}\n",
+        );
+        assert!(
+            t.calls.values().any(|name| name == "helper"),
+            "qualified call `Foo.helper()` must be captured: {:?}",
+            t.calls
+        );
+        assert!(
+            t.calls.values().any(|name| name == "bare"),
+            "bare call must still be captured: {:?}",
+            t.calls
         );
     }
 }
