@@ -1,6 +1,6 @@
 //! Syntax-aware chunking (ADR-0010), absorbed from `agent-runner/src/indexer/chunker.rs`. For
 //! supported languages we use tree-sitter to extract named top-level items (functions, structs,
-//! classes, impls, methods). A node is interesting either because [`interesting_node`] recognises its
+//! classes, impls, methods). A node is interesting either because `interesting_node` recognises its
 //! kind directly, or — for a language the shared `tags.scm` query already classifies (ADR-0086
 //! language expansion) — because that query already tagged it as a definition; either source yields
 //! the same `(chunk_type, symbol_name)` shape, so the walk below doesn't need to know which one fired.
@@ -87,7 +87,7 @@ pub fn chunk_file(
 /// nodes were found; the caller decides whether to window-fall-back.
 ///
 /// For a language the shared `tags.scm` query classifies, that query's definitions are consulted
-/// alongside [`interesting_node`]'s own node-kind table (see [`tags::extract`]); `None` for a language
+/// alongside `interesting_node`'s own node-kind table (see [`tags::extract`]); `None` for a language
 /// with no such query (Rust keeps its own extractor as the sole source; an unregistered language has
 /// no grammar to query in the first place).
 #[must_use]
