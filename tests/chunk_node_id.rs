@@ -119,13 +119,12 @@ fn node_id_is_none_for_a_windowed_fallback_chunk_even_with_build_graph_true() {
 }
 
 #[test]
-fn node_id_is_none_for_a_chunk_with_no_matching_definition() {
-    // TypeScript: an arrow function bound to a `variable_declarator` is chunked ANONYMOUSLY
-    // (`chunk::interesting_node`'s `variable_declarator` arm returns `None`, so `arrow_function`
-    // yields `("function", None)` — no name reaches the chunk), while the tags-driven graph pass DOES
-    // recover the binding's name. The computed candidate id (keyed on the chunk's own, name-less
-    // fallback) therefore cannot exist in the real node set: `None` is the only honest answer here,
-    // not a guess.
+fn a_definition_with_no_interesting_node_arm_still_links_to_its_graph_node() {
+    // TypeScript: an arrow function bound to a `variable_declarator` has no arm in
+    // `chunk::interesting_node`'s own node-kind table. The shared tags query already classifies it
+    // (that's how the graph pass knows it as `arrowFn`), and chunking falls back to that same
+    // classification — so the chunk carries the real name and links to the same graph node a
+    // directly-recognised definition would.
     let options = IndexOptions::builder().build_graph(true).build();
     let out = index_inputs(
         vec![RawInput::text(
@@ -135,19 +134,17 @@ fn node_id_is_none_for_a_chunk_with_no_matching_definition() {
         &options,
     );
 
-    assert!(
-        out.graph.nodes.iter().any(|n| n.label == "arrowFn()"),
-        "sanity: the graph pass does know this symbol by name: {:?}",
-        out.graph.nodes
-    );
+    let node = out
+        .graph
+        .nodes
+        .iter()
+        .find(|n| n.label == "arrowFn()")
+        .expect("graph pass knows this symbol by name");
     let chunk = out
         .chunks
         .iter()
-        .find(|c| c.chunk_type == "function")
-        .expect("the arrow function is still chunked, just anonymously");
-    assert_eq!(chunk.symbol_name, None);
-    assert_eq!(
-        chunk.node_id, None,
-        "no honest match exists for an anonymous chunk whose graph def DOES have a name"
-    );
+        .find(|c| c.symbol_name.as_deref() == Some("arrowFn"))
+        .expect("the arrow function is chunked under its real name");
+    assert_eq!(chunk.chunk_type, "function");
+    assert_eq!(chunk.node_id.as_deref(), Some(node.node_id.as_str()));
 }
