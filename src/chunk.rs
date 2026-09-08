@@ -1,13 +1,18 @@
 //! Syntax-aware chunking (ADR-0010), absorbed from `agent-runner/src/indexer/chunker.rs`. For
 //! supported languages we use tree-sitter to extract named top-level items (functions, structs,
-//! classes, impls, methods). For everything else — or when the file is too large / unparseable — we
-//! fall back to a fixed-size line window. PDF-extracted text takes the same windowed path.
+//! classes, impls, methods). A node is interesting either because `interesting_node` recognises its
+//! kind directly, or — for a language the shared `tags.scm` query already classifies (ADR-0086
+//! language expansion) — because that query already tagged it as a definition; either source yields
+//! the same `(chunk_type, symbol_name)` shape, so the walk below doesn't need to know which one fired.
+//! For everything else — or when the file is too large / unparseable — we fall back to a fixed-size
+//! line window. PDF-extracted text takes the same windowed path.
 
 use serde::Serialize;
 use tree_sitter::{Node, Tree};
 
 use crate::IndexTuning;
 use crate::lang;
+use crate::tags::{self, TaggedSymbols};
 
 /// Skip files larger than this (avoids embedding enormous generated files). The chunk-line ceiling
 /// and the windowed-fallback sizes are operator-tunable — see [`IndexTuning`].
@@ -80,6 +85,11 @@ pub fn chunk_file(
 /// Chunk a **pre-parsed** tree — used by the walk so a Rust file is parsed once and fed to both the
 /// chunker and the graph builder (ADR-0086 "parse once"). Returns an empty vec if no interesting
 /// nodes were found; the caller decides whether to window-fall-back.
+///
+/// For a language the shared `tags.scm` query classifies, that query's definitions are consulted
+/// alongside `interesting_node`'s own node-kind table (see [`tags::extract`]); `None` for a language
+/// with no such query (Rust keeps its own extractor as the sole source; an unregistered language has
+/// no grammar to query in the first place).
 #[must_use]
 pub fn chunk_tree(
     tree: &Tree,
@@ -90,6 +100,7 @@ pub fn chunk_tree(
 ) -> Vec<Chunk> {
     let root = tree.root_node();
     let bytes = source.as_bytes();
+    let tagged = tags::extract(language, tree, source);
     let mut chunks = Vec::new();
     collect_items(
         &root,
@@ -98,6 +109,7 @@ pub fn chunk_tree(
         source,
         language,
         tuning,
+        tagged.as_ref(),
         &mut chunks,
     );
     chunks
@@ -129,6 +141,7 @@ pub(crate) fn is_binary(source: &str) -> bool {
 
 /// Recursively collect interesting nodes. We walk the full tree (not just top-level children) so that
 /// methods inside `impl` blocks, nested functions, and inner classes are captured.
+#[allow(clippy::too_many_arguments)]
 fn collect_items(
     node: &Node<'_>,
     bytes: &[u8],
@@ -136,11 +149,13 @@ fn collect_items(
     source: &str,
     language: &str,
     tuning: IndexTuning,
+    tagged: Option<&TaggedSymbols>,
     out: &mut Vec<Chunk>,
 ) {
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        if let Some((chunk_type, symbol_name)) = interesting_node(&child, bytes) {
+        let hit = interesting_node(&child, bytes).or_else(|| tagged_definition(&child, tagged));
+        if let Some((chunk_type, symbol_name)) = hit {
             let start_line = child.start_position().row as i32;
             let end_line = child.end_position().row as i32;
             let span = (end_line - start_line) as usize;
@@ -161,11 +176,15 @@ fn collect_items(
                     embed_input: None,
                 });
                 // Also recurse so methods inside a small impl / class are independently indexed.
-                collect_items(&child, bytes, file_path, source, language, tuning, out);
+                collect_items(
+                    &child, bytes, file_path, source, language, tuning, tagged, out,
+                );
             } else {
                 // Large node: try to extract interesting children (e.g. methods inside a big impl).
                 let before = out.len();
-                collect_items(&child, bytes, file_path, source, language, tuning, out);
+                collect_items(
+                    &child, bytes, file_path, source, language, tuning, tagged, out,
+                );
                 if out.len() == before {
                     // No interesting sub-nodes (e.g. a 200-line function with no nested fns). Emit it
                     // as a single chunk rather than silently dropping it; the embedding API will
@@ -186,7 +205,9 @@ fn collect_items(
             }
         } else {
             // Not an interesting node itself — still descend to find nested interesting nodes.
-            collect_items(&child, bytes, file_path, source, language, tuning, out);
+            collect_items(
+                &child, bytes, file_path, source, language, tuning, tagged, out,
+            );
         }
     }
 }
@@ -197,6 +218,16 @@ pub(crate) fn interesting_node(
     node: &Node<'_>,
     bytes: &[u8],
 ) -> Option<(&'static str, Option<String>)> {
+    // Python: a decorator wraps a `class_definition` or `function_definition` in its `definition`
+    // field — the decorated node itself carries the wrapped definition's own kind and name rather
+    // than a fixed placeholder, so `@dataclass class Point: ...` chunks as a named class like any
+    // other, not as an anonymous function.
+    if node.kind() == "decorated_definition" {
+        return node
+            .child_by_field_name("definition")
+            .and_then(|inner| interesting_node(&inner, bytes));
+    }
+
     let (kind, name_field) = match node.kind() {
         // Rust
         "function_item" => ("function", Some("name")),
@@ -225,7 +256,6 @@ pub(crate) fn interesting_node(
         // Python
         "function_definition" => ("function", Some("name")),
         "class_definition" => ("class", Some("name")),
-        "decorated_definition" => ("function", None), // decorator + def/class
         _ => return None,
     };
 
@@ -238,6 +268,18 @@ pub(crate) fn interesting_node(
     });
 
     Some((kind, symbol_name))
+}
+
+/// Returns `(chunk_type, symbol_name)` for a node the shared `tags.scm` query already classified as
+/// a definition, or `None` when there's no query for this language, or this particular node isn't one
+/// of its definitions. Consulted as a fallback to [`interesting_node`], so a language's own node-kind
+/// table always wins where the two would otherwise overlap.
+fn tagged_definition(
+    node: &Node<'_>,
+    tagged: Option<&TaggedSymbols>,
+) -> Option<(&'static str, Option<String>)> {
+    let def = tagged?.defs.get(&node.id())?;
+    Some((def.kind, def.name.clone()))
 }
 
 /// Fixed-size line windows with overlap — the fallback for text / unsupported languages.
@@ -399,5 +441,98 @@ mod tests {
         // prefix sniff, not a full scan. Documented so the bound is a decision, not an accident.
         let late = format!("{}\0", "x".repeat(512));
         assert!(!is_binary(&late));
+    }
+
+    #[test]
+    fn java_methods_and_interfaces_are_chunked_at_symbol_granularity() {
+        // Java has no arms of its own in `interesting_node` — only `class_declaration` matches, by
+        // coincidence of sharing a node-kind name with TypeScript. Methods and interface members
+        // come from the shared tags query instead.
+        let src = "public class Widget {\n    public int area() { return 1; }\n    public String describe() { return \"\"; }\n}\n\ninterface Shape {\n    double perimeter();\n}\n";
+        let chunks = chunk_file("Widget.java", src, "java", IndexTuning::default());
+        let names: Vec<Option<&str>> = chunks.iter().map(|c| c.symbol_name.as_deref()).collect();
+        assert!(names.contains(&Some("area")), "got {names:?}");
+        assert!(names.contains(&Some("describe")), "got {names:?}");
+        assert!(names.contains(&Some("perimeter")), "got {names:?}");
+    }
+
+    #[test]
+    fn a_java_class_over_max_chunk_lines_splits_on_its_methods() {
+        // Previously the class had no interesting children to recurse into, so it was emitted whole
+        // regardless of `max_chunk_lines` — the tags fallback gives it method-level children to
+        // split on instead.
+        let methods: String = (0..40)
+            .map(|i| format!("    public void m{i}() {{ System.out.println({i}); }}\n"))
+            .collect();
+        let src = format!("public class Big {{\n{methods}}}\n");
+        let tuning = IndexTuning {
+            max_chunk_lines: 20,
+            ..IndexTuning::default()
+        };
+        let chunks = chunk_file("Big.java", &src, "java", tuning);
+        assert!(
+            chunks.len() > 1,
+            "a class with 40 methods must split into more than one chunk"
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| c.symbol_name.as_deref() == Some("m0")),
+            "individual methods must be their own chunks: {chunks:?}"
+        );
+    }
+
+    #[test]
+    fn a_typescript_interface_member_is_chunked() {
+        // `interface_declaration` has no arm in `interesting_node` either; the tags query already
+        // classifies interfaces and their methods for the graph.
+        let src = "export interface Repo<T> {\n    find(id: string): T | null;\n}\n";
+        let chunks = chunk_file("repo.ts", src, "typescript", IndexTuning::default());
+        let names: Vec<Option<&str>> = chunks.iter().map(|c| c.symbol_name.as_deref()).collect();
+        assert!(names.contains(&Some("Repo")), "got {names:?}");
+        assert!(names.contains(&Some("find")), "got {names:?}");
+    }
+
+    #[test]
+    fn a_decorated_python_class_keeps_its_own_kind_and_name() {
+        let src = "@dataclass\nclass Point:\n    x: int\n";
+        let chunks = chunk_file("point.py", src, "python", IndexTuning::default());
+        let point = chunks
+            .iter()
+            .find(|c| c.symbol_name.as_deref() == Some("Point"))
+            .expect("the decorated class is chunked under its own name");
+        assert_eq!(point.chunk_type, "class");
+    }
+
+    #[test]
+    fn scala_dart_and_swift_definitions_are_chunked_at_symbol_granularity() {
+        for (path, lang, src, expected_name) in [
+            (
+                "Svc.scala",
+                "scala",
+                "object Svc {\n  def run(): Unit = {}\n}\n",
+                "run",
+            ),
+            (
+                "svc.dart",
+                "dart",
+                "class Svc {\n  void run() {}\n}\n",
+                "run",
+            ),
+            (
+                "Svc.swift",
+                "swift",
+                "class Svc {\n  func run() {}\n}\n",
+                "run",
+            ),
+        ] {
+            let chunks = chunk_file(path, src, lang, IndexTuning::default());
+            let names: Vec<Option<&str>> =
+                chunks.iter().map(|c| c.symbol_name.as_deref()).collect();
+            assert!(
+                names.contains(&Some(expected_name)),
+                "{lang}: got {names:?}"
+            );
+        }
     }
 }
