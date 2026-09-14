@@ -1418,7 +1418,7 @@ dependencies = [
 
 [[package]]
 name = "lci-codegraph"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "bon",
@@ -1454,7 +1454,7 @@ dependencies = [
 
 [[package]]
 name = "lci-codegraph-model"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1462,7 +1462,7 @@ dependencies = [
 
 [[package]]
 name = "lci-codegraph-spring"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "lci-codegraph-model",
  "tree-sitter",

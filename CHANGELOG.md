@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-09-14
 
 ### Added
 
@@ -20,6 +20,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   definitions/calls with, so each is parsed but chunked via the windowed-text fallback, same as any
   language with no grammar at all — just no longer opaque text. `.json` was previously folded into
   the generic `text` tag; it now has its own grammar and language id.
+
+### Fixed
+
+- Symbol-level chunking now consults the shared `tags.scm` classification for any node the internal
+  `interesting_node` table doesn't recognise, instead of dropping straight to windowed chunking.
+  Java, CrateStack, Scala, Dart and Swift gain real symbol chunks (methods, constructors, interfaces,
+  enums, records) with no per-language code, and the `max_chunk_lines` cap now reaches languages with
+  no `interesting_node` arms of their own. TypeScript definitions that `interesting_node` treats as
+  anonymous (an arrow function bound to a `variable_declarator`) or doesn't recognise at all
+  (`interface_declaration` and its members) recover their real names, and a decorated Python
+  definition inherits its wrapped definition's kind and name in place of a fixed placeholder. Every
+  language `interesting_node` already covers keeps identical chunk boundaries.
 
 ## [0.2.0] - 2026-08-28
 
@@ -242,5 +254,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deeply nested PDF objects that aborts the process with `SIGABRT`. Because that is an abort and
   not a panic, the crate's `catch_unwind` guard could not contain it.
 
+[0.3.0]: https://github.com/ADORSYS-GIS/lci-codegraph/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ADORSYS-GIS/lci-codegraph/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ADORSYS-GIS/lci-codegraph/releases/tag/v0.1.0
